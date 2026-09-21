@@ -1,25 +1,66 @@
 constraints:
   - id: legal.max_weekly_hours
     kind: legal
+    hard: true
     rule: Each employee works at most 40 scheduled hours in the modeled week.
+    value: 40
     source: Jornada40 product brief
+    removal_impact: Removing this constraint can concentrate work above the 40-hour limit and invalidate the challenge scenario.
+
   - id: operational.availability
     kind: operational
+    hard: true
     rule: Assignments may only occur inside employee availability windows.
+    value: employee availability intervals
     source: Workforce operating policy
+    removal_impact: Removing this constraint can create schedules that employees cannot execute.
+
   - id: operational.hourly_coverage
     kind: operational
-    rule: Every modeled demand bucket should be covered; uncovered demand is reported.
+    hard: true
+    rule: Every modeled demand bucket should be covered; infeasible uncovered demand is explicitly reported.
+    value: scenario demand
     source: Service-level operating target
+    removal_impact: Removing this constraint would allow apparent savings through understaffing.
+
   - id: product.deterministic_demo
     kind: product
+    hard: true
     rule: The demo scenario is reproducible from a fixed seed.
+    value: seed-controlled dataset generation and deterministic solver configuration
     source: MVP acceptance criterion
+    removal_impact: Removing determinism makes results harder to reproduce and audit during the demo.
+
   - id: product.explainable_output
     kind: product
+    hard: true
     rule: Results expose coverage, violations, cost, and constraint evaluations.
+    value: required result fields
     source: MVP acceptance criterion
+    removal_impact: Removing explainability prevents an operator from auditing why a schedule was produced.
+
   - id: implementation.solver
     kind: implementation
+    hard: true
     rule: The optimizer uses OR-Tools CP-SAT and fails clearly when unavailable.
+    value: OR-Tools CP-SAT
     source: MVP technical direction
+    removal_impact: Replacing the solver is possible, but requires preserving the domain constraints and verification contract.
+
+  - id: operational.peak_coverage
+    kind: operational
+    hard: true
+    rule: Peak-hour coverage must be preserved in the full challenge model.
+    value: configurable peak staffing requirement
+    source: Challenge acceptance criterion
+    removal_impact: Removing peak coverage can create misleading savings by reducing staffing during high-demand periods.
+    status: planned
+
+  - id: financial.minimum_savings
+    kind: product
+    hard: false
+    rule: The challenge scenario should demonstrate at least 8% labor-cost savings without violating hard constraints.
+    value: 8%
+    source: Challenge acceptance criterion
+    removal_impact: Removing this target changes the business acceptance criterion but does not affect schedule feasibility.
+    status: planned
