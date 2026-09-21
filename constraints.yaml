@@ -1,0 +1,25 @@
+constraints:
+  - id: legal.max_weekly_hours
+    kind: legal
+    rule: Each employee works at most 40 scheduled hours in the modeled week.
+    source: Jornada40 product brief
+  - id: operational.availability
+    kind: operational
+    rule: Assignments may only occur inside employee availability windows.
+    source: Workforce operating policy
+  - id: operational.hourly_coverage
+    kind: operational
+    rule: Every modeled demand bucket should be covered; uncovered demand is reported.
+    source: Service-level operating target
+  - id: product.deterministic_demo
+    kind: product
+    rule: The demo scenario is reproducible from a fixed seed.
+    source: MVP acceptance criterion
+  - id: product.explainable_output
+    kind: product
+    rule: Results expose coverage, violations, cost, and constraint evaluations.
+    source: MVP acceptance criterion
+  - id: implementation.solver
+    kind: implementation
+    rule: The optimizer uses OR-Tools CP-SAT and fails clearly when unavailable.
+    source: MVP technical direction
