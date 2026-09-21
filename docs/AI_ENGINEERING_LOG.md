@@ -2,7 +2,16 @@
 
 ## Delegated work
 
-No child agent was used. The implementation writer created the repository artifacts directly.
+The project used bounded AI-agent work units with human review between them:
+
+| Work unit | Delegated responsibility | Human supervision and validation |
+| --- | --- | --- |
+| Core vertical slice | Create the deterministic generator, demand engine, CP-SAT optimizer, verifier, economics, CLI, tests, and initial documentation. | Reviewed the returned artifacts, ran the test/demo commands, and required an independent verification pass. |
+| Verification | Independently inspect the generated schedule and verifier behavior. | Accepted the finding that overlapping assignments were not rejected and required a focused correction. |
+| Baseline/economics | Add a deterministic current schedule and schedule-derived Current vs Optimized economics. | Reviewed the negative savings result as an honest coverage tradeoff rather than accepting a fabricated 8\% claim. |
+| Baseline hardening | Add overlap and unknown-employee diagnostics and remove an unsupported documentation claim. | Re-ran the full test suite and CLI before commit. |
+
+The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes.
 
 ## Human validation boundaries
 

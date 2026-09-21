@@ -1,0 +1,372 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=25mm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs,longtable,array}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{hyperref}
+
+\definecolor{almondbrown}{HTML}{6F4E37}
+\definecolor{lightalmond}{HTML}{FFF8E7}
+\definecolor{lightgray}{HTML}{F3F4F6}
+\hypersetup{colorlinks=true,linkcolor=almondbrown,urlcolor=blue,citecolor=almondbrown}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlength{\itemsep}{1pt}
+\setlength{\headheight}{14pt}
+\setlength{\tabcolsep}{3pt}
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{Almond Technical Report}
+\rhead{Jornada40 MVP}
+\cfoot{\thepage}
+
+\newcommand{\repo}{\href{https://github.com/FernandoMay/Almond}{github.com/FernandoMay/Almond}}
+\newcommand{\planned}{\textit{Planned}}
+\newcommand{\implemented}{\textbf{Implemented}}
+\newcommand{\callout}[1]{\begin{center}\fcolorbox{almondbrown}{lightalmond}{\begin{minipage}{0.91\linewidth}\small #1\end{minipage}}\end{center}}
+\newcommand{\revisionhistory}{%
+\begin{table}[ht]
+\centering
+\caption{Revision history}
+\begin{tabular}{p{0.18\linewidth}p{0.18\linewidth}p{0.52\linewidth}}
+\toprule
+Version & Date & Description\\
+\midrule
+0.1.0 & 2026-09-21 & Initial technical report for commit \texttt{95ca2cf}.\\
+\bottomrule
+\end{tabular}
+\end{table}}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{25mm}
+{\Huge\bfseries Almond\par}
+\vspace{5mm}
+{\LARGE Jornada40 Workforce Optimization MVP\par}
+\vspace{15mm}
+{\Large Technical Report\par}
+\vfill
+\begin{tabular}{rl}
+Version: & 0.1.0\\
+As-of commit: & \texttt{95ca2cf}\\
+Date: & 2026-09-21\\
+Repository: & \repo
+\end{tabular}
+\vfill
+{\large Deterministic workforce scheduling, verification, and economics\par}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Executive summary}
+Almond is the backend and core-engine MVP for Jornada40. It transforms deterministic hourly visitor demand, employee availability, and MXN hourly rates into an explainable schedule. The implementation is a small Python vertical slice: data generation, demand calculation, a CP-SAT optimizer, independent verification, baseline analysis, schedule-derived economics, and a JSON command-line demo.
+
+\callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled coverage with an optimized cost of 16,402 MXN. Its generated current schedule costs 15,680 MXN and covers 74.27\% of demand, so the honest cost delta is \textbf{-722 MXN avoided} or \textbf{-4.6\% savings}. The result is not presented as an artificial 8\% saving: the current model buys additional coverage.}
+
+\subsection{Current status}
+\begin{tabular}{p{0.28\linewidth}p{0.62\linewidth}}
+\toprule
+Area & Status\\
+\midrule
+Deterministic scenario & \implemented: seed 40, seven days, ten opening hours per day, seven employees.\\
+Demand and scheduling & \implemented: integer hourly demand and OR-Tools CP-SAT candidate schedule.\\
+Hard constraints & \implemented: availability, one contiguous daily interval, and at most 40 weekly hours.\\
+Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, and coverage checks.\\
+Economics & \implemented: schedule-derived MXN cost, coverage, understaffing, overstaffing, and delta.\\
+Product surface & \implemented: CLI JSON; API, UI, persistence, and deployment are \planned.\\
+\bottomrule
+\end{tabular}
+
+\section{Business problem and product scope}
+Retail or service operations need to translate hourly demand into staffing decisions without hiding feasibility failures or overstating financial impact. The first product question is deliberately narrow: \emph{how many people are needed each hour, what schedule satisfies that demand, and what does it cost?}
+
+The MVP accepts synthetic hourly visitors, employee availability, and fixed hourly rates. It returns a candidate schedule, constraint evaluations, independent verification, coverage metrics, and a comparison with a deterministic current schedule. The system is an engine, not a production workforce-management product.
+
+\subsection{In scope}
+\begin{itemize}
+  \item One generic employee role and integer hourly demand.
+  \item Seven modeled days with opening hours 08:00--18:00.
+  \item Fixed hourly MXN rates and per-day availability windows.
+  \item One contiguous interval per employee per day.
+  \item A current schedule versus optimized schedule flow.
+  \item Explicit uncovered demand rather than silent infeasibility.
+\end{itemize}
+
+\subsection{Out of scope at this commit}
+Breaks, skills, overtime premiums, absences, payroll integration, persistence, API, UI, deployment, configurable shift rules, and configurable objective weights are \planned. Peak-specific coverage is also \planned; the implemented model uses every modeled demand bucket.
+
+\section{Architecture and module responsibilities}
+The engine is a functional pipeline:
+\begin{center}
+\texttt{deterministic scenario -> demand -> current baseline/CP-SAT -> verification -> economics/explanations -> CLI JSON}
+\end{center}
+
+\begin{longtable}{p{0.24\linewidth}p{0.68\linewidth}}
+\caption{Module responsibilities}\label{tab:modules}\\
+\toprule
+Module & Responsibility\\
+\midrule
+\endfirsthead
+\toprule
+Module & Responsibility\\
+\midrule
+\endhead
+\texttt{models.py} & Immutable domain dataclasses: employees, demand points, scenarios, assignments, schedules, verification, baseline analysis, economics, and optimization results.\\
+\texttt{generator.py} & Seeded demo data and the rotating 08:00--16:00 current schedule.\\
+\texttt{demand.py} & Ceiling-based staffing requirement from visitors and service time.\\
+\texttt{baseline.py} & Current-schedule analysis, validation evidence, coverage, and schedule cost.\\
+\texttt{optimizer.py} & The only CP-SAT-dependent module; builds, solves, and reconstructs candidate assignments.\\
+\texttt{verifier.py} & Independent post-solve checks; it does not call the optimizer.\\
+\texttt{economics.py} & Compares schedule-derived costs and operational metrics.\\
+\texttt{explain.py} & Lightweight constraint status suitable for the CLI output.\\
+\texttt{cli.py} & Composes the vertical slice and prints sorted, indented JSON.\\
+\bottomrule
+\end{longtable}
+
+Domain objects do not depend on OR-Tools. This separation makes the verifier independent of solver decisions and keeps domain behavior testable without embedding solver assumptions in every module.
+
+\section{Data model and deterministic synthetic scenario}
+The principal immutable records are:
+\begin{itemize}
+  \item \texttt{Employee(id, hourly\_cost\_mxn, availability)};
+  \item \texttt{DemandPoint(day, hour, demand, visitors)};
+  \item \texttt{Scenario(employees, demand, days, open\_start, open\_end)};
+  \item \texttt{Assignment(employee\_id, day, start, end)}, with end exclusive;
+  \item \texttt{Schedule(assignments)}, with per-employee hour aggregation.
+\end{itemize}
+
+The demo uses \texttt{random.Random(40)}. It creates seven employees, E1 through E7, with rates from 58 to 82 MXN/hour in four-MXN increments. Every employee is available from 08:00 through 18:00 on each of seven days. For day $d$ and hour $h$, visitors are generated as
+\[
+V_{d,h}=10+2(h-8)+3(d\bmod 3)+\operatorname{randint}(0,5),
+\]
+and required staff is
+\[
+R_{d,h}=\max\left(1,\left\lceil\frac{8V_{d,h}}{60}\right\rceil\right).
+\]
+Hours are integer buckets; all intervals use $[\text{start},\text{end})$ semantics and all costs are integer MXN amounts.
+
+The generated current schedule rotates four employees per day through 08:00--16:00. The last two opening hours are intentionally uncovered by this simple fixed-shift baseline. This is a deterministic operational comparison, not a fully open or presumed-optimal schedule.
+
+\section{Solver formulation}
+\subsection{Decision variables}
+For employee $e$, day $d$, and modeled hour $h$:
+\[
+x_{e,d,h}\in\{0,1\},\qquad x_{e,d,h}=1\text{ iff employee }e\text{ works hour }h.
+\]
+For every demand bucket:
+\[
+0\le u_{d,h}\le R_{d,h},
+\]
+where $u_{d,h}$ is explicit uncovered demand.
+
+\subsection{Hard constraints}
+\textbf{Weekly hours.} For every employee, $\sum_{d,h}x_{e,d,h}\le40$.
+
+\textbf{Availability.} If $h$ is outside the employee's daily window, $x_{e,d,h}=0$.
+
+\textbf{Coverage accounting.} Each bucket satisfies
+\[
+\sum_e x_{e,d,h}+u_{d,h}\ge R_{d,h}.
+\]
+The slack variable makes shortage explicit and bounded rather than allowing a hidden invalid result.
+
+\textbf{Daily contiguity.} At most one start variable is allowed for an employee/day. A later worked hour requires continuity from the previous hour or a start at that hour. This prevents two separated intervals from being represented as one daily assignment.
+
+\subsection{Objective and deterministic settings}
+The implemented objective is
+\[
+\min\left(\sum_{e,d,h}x_{e,d,h}c_e+10{,}000\sum_{d,h}u_{d,h}\right),
+\]
+where $c_e$ is the employee's hourly MXN rate. The coefficient 10,000 strongly prioritizes coverage before labor cost in this demo. OR-Tools CP-SAT is configured with \texttt{num\_search\_workers = 1} and \texttt{random\_seed = 40}. The CLI reports the exact solver status; the current run is \texttt{OPTIMAL}.
+
+\subsection{Implemented versus planned capabilities}
+\begin{tabular}{p{0.34\linewidth}p{0.51\linewidth}}
+\toprule
+Capability & Status at \texttt{95ca2cf}\\
+\midrule
+Availability, weekly cap, daily contiguity & \implemented hard constraints.\\
+Hourly coverage with bounded uncovered demand & \implemented constraint and penalty.\\
+Current schedule and schedule-derived economics & \implemented.\\
+Peak-hour coverage target & \planned.\\
+Overtime premiums and overtime economics & \planned.\\
+Schedule-change penalties & \planned.\\
+Configurable shift lengths and breaks & \planned.\\
+Configurable objective weights & \planned.\\
+\bottomrule
+\end{tabular}
+
+The optimizer proposes; the verifier decides whether the returned schedule is valid; economics measures the resulting financial and coverage tradeoff. No UI should infer validity or savings independently.
+
+\section{Baseline, current schedule, and economics}
+\subsection{Formulas}
+For an assignment $a$, hours are $a.end-a.start$. Schedule cost is
+\[
+C(S)=\sum_{a\in S}\operatorname{hours}(a)\,c_{\operatorname{employee}(a)}.
+\]
+Coverage percentage is demand-weighted capped coverage:
+\[
+\operatorname{Coverage}(S)=100\times
+\frac{\sum_{d,h}\min(\operatorname{coverage}_S(d,h),R_{d,h})}
+{\sum_{d,h}R_{d,h}}.
+\]
+Avoided cost and savings are
+\[
+A=C_{current}-C_{optimized},\qquad
+P=100\times\frac{A}{C_{current}}.
+\]
+The implementation returns zero percentage when the current cost is zero.
+
+\subsection{Latest deterministic demo metrics}
+\begin{table}[ht]
+\centering
+\caption{Current versus optimized demo output}
+\begin{tabular}{lrr}
+\toprule
+Metric & Current & Optimized\\
+\midrule
+Cost (MXN) & 15,680 & 16,402\\
+Coverage & 74.27\% & 100.00\%\\
+Understaffing & 62 & 0\\
+Overstaffing & 45 & 0\\
+Verifier violations & 16 coverage & 0\\
+\midrule
+Avoided cost & \multicolumn{2}{c}{-722 MXN}\\
+Savings & \multicolumn{2}{c}{-4.6\%}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The flow is intentionally explicit: generate one scenario; construct the rotating current schedule; optimize the same scenario; independently analyze and verify the optimized schedule; then compare schedule-derived costs. The negative result is honest. The current schedule spends less because it leaves demand uncovered, while the optimizer spends 722 MXN more to reach complete modeled coverage. Reporting an invented 8\% saving would confuse a cost reduction with a service-level improvement and would violate the project's requirement that savings be computed from assignments and rates.
+
+% Future maintainers: update this table and the executive callout only after re-running the pinned demo command.
+
+\section{Independent verification and validation}
+The verifier is a separate module and checks every returned assignment for:
+\begin{itemize}
+  \item known employee identity;
+  \item non-empty interval and availability containment;
+  \item overlap or duplicate assignment for the same employee and day;
+  \item no more than 40 aggregate weekly hours;
+  \item coverage at every demand bucket.
+\end{itemize}
+
+Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
+
+\subsection{Tests and exact verification commands}
+The repository test suite contains ten tests, and the observed result at this commit is:
+\begin{verbatim}
+.venv/bin/pytest -q
+..........                                                               [100%]
+\end{verbatim}
+The executable demo was also run as:
+\begin{verbatim}
+.venv/bin/almond
+\end{verbatim}
+It returned JSON with \texttt{solver\_status: OPTIMAL}, the metrics in Table 3, empty optimized violations, and all three reported constraint evaluations true. PDF verification for this report is specified in Section~\ref{sec:repro}.
+
+\section{Constraint registry and traceability}
+\begin{longtable}{p{0.19\linewidth}p{0.22\linewidth}p{0.12\linewidth}p{0.13\linewidth}p{0.24\linewidth}}
+\caption{Implemented constraint registry}\label{tab:registry}\\
+\toprule
+Constraint & Source & Kind & Hardness & Removal impact\\
+\midrule
+\endfirsthead
+\toprule
+Constraint & Source & Kind & Hardness & Removal impact\\
+\midrule
+\endhead
+Availability & \texttt{optimizer.py}; \texttt{verifier.py} & Feasibility & Hard & Employees could be scheduled outside declared windows.\\
+Weekly hours & \texttt{optimizer.py}; \texttt{verifier.py} & Feasibility & Hard & A schedule could exceed the 40-hour cap.\\
+Hourly coverage & \texttt{optimizer.py}; \texttt{verifier.py} & Service level & Hard in verifier; shortage represented by $u$ in solver & Coverage failures could be hidden or accepted without evidence.\\
+Uncovered demand bound & \texttt{optimizer.py} & Slack accounting & Bounded & Shortage could become unbounded or distort objective behavior.\\
+Daily contiguity & \texttt{optimizer.py} & Shift shape & Hard in model & Split shifts could be emitted as one assignment.\\
+Overlap detection & \texttt{verifier.py}; \texttt{baseline.py} & Data validity & Hard for verification & Duplicate work would inflate apparent coverage and hours.\\
+Known employee & \texttt{verifier.py}; \texttt{baseline.py} & Referential validity & Hard for verification & Unknown IDs would become unaudited schedule data.\\
+Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Derived, not solver-hard & Economics could be disconnected from actual assignments.\\
+\bottomrule
+\end{longtable}
+
+\section{AI-assisted engineering log}
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; and a later implementation writer added the current-schedule baseline and schedule-derived economics. A final hardening pass added baseline overlap and unknown-employee diagnostics and removed an unsupported documentation claim.
+
+The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
+
+Independent review boundaries are concrete rather than rhetorical: the verifier is separate from the solver, regression tests exercise invalid availability, overlap, unknown employees, economics, deterministic generation, and zero-cost safety, and the CLI exposes the evidence. The repository history and tests specifically preserve defects around overlap/duplicate assignments and unknown employee cost handling as regression coverage. These checks validate software behavior; they do not validate labor law, payroll, wage accuracy, or operational policy.
+
+The human owner remains responsible for legal interpretation, service-time assumptions, wage data, operational availability rules, and production use of schedules. Passing automated tests is not legal or payroll approval.
+
+The decisive solver prompt recorded by the project is:
+\begin{quote}
+Given hourly demand and employee availability, choose binary hourly assignments that minimize MXN labor cost plus uncovered-demand penalty. Enforce availability, at most one contiguous interval per employee per day, and no more than 40 weekly hours. Return a schedule that an independent verifier can inspect.
+\end{quote}
+
+\section{Engineering decisions, limitations, risks, and roadmap}
+\subsection{Decisions}
+\begin{itemize}
+  \item Keep domain dataclasses independent from OR-Tools.
+  \item Use deterministic seed and single-worker CP-SAT settings for reproducible demos.
+  \item Make uncovered demand explicit and penalized rather than silently relaxing coverage.
+  \item Compare against a plausible current schedule, not a fabricated full-open schedule.
+  \item Compute costs from generated assignments and employee rates.
+\end{itemize}
+
+\subsection{Limitations and risks}
+The synthetic scenario is not a forecast. Service time is fixed at eight minutes, each employee has one generic role, rates are fixed, and no break or overtime policy exists. The large finite penalty is a modeling choice, not a legal service-level guarantee. The baseline's coverage loss is intentional, so cost-only comparisons are misleading without coverage. Finally, the CLI is not an authorization boundary for production schedules.
+
+\subsection{Roadmap}
+The next engineering increments should add peak coverage requirements, overtime premiums, breaks, configurable shift rules, schedule-change penalties, and objective weights while preserving independent verification. API and UI layers should consume domain results rather than recompute validity or savings. Persistence and deployment controls should follow once data contracts and operational approvals exist. A defensible $\ge8\%$ savings scenario should be created only by changing explicit scenario inputs or operational assumptions, documenting the change, and verifying that coverage and constraints remain acceptable; it must never be back-solved from a desired headline.
+
+\section{Reproducibility}
+\label{sec:repro}
+From the repository root, install the package and run the following:
+\begin{verbatim}
+python -m pip install -e "."
+.venv/bin/pytest -q
+.venv/bin/almond
+pdflatex -interaction=nonstopmode -halt-on-error \
+  -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
+pdflatex -interaction=nonstopmode -halt-on-error \
+  -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
+\end{verbatim}
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The report is tied to commit \texttt{95ca2cf}; later code changes require re-running both the demo and the report's metric claims.
+
+\section{Evidence table}
+\begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
+\caption{Claim-to-repository traceability}\label{tab:evidence}\\
+\toprule
+Claim or section & Evidence path(s)\\
+\midrule
+Product scope and limitations & \texttt{README.md}; \texttt{docs/PRODUCT.md}; \texttt{docs/ASSUMPTIONS.md}\\
+Architecture and module boundaries & \texttt{docs/ARCHITECTURE.md}; \texttt{src/almond/*.py}\\
+Data model and interval semantics & \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/models.py}\\
+Demand generation & \texttt{src/almond/generator.py}; \texttt{src/almond/demand.py}\\
+Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.md}; \texttt{src/almond/optimizer.py}\\
+Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
+Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
+AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
+Exact implementation revision & Git commit \texttt{95ca2cf} (repository history).\\
+\bottomrule
+\end{longtable}
+
+\section{References}
+All references are internal to the repository; no external claims are required for this report.
+\begin{enumerate}
+  \item \texttt{README.md}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{95ca2cf}.
+\end{enumerate}
+
+\revisionhistory
+
+\end{document}
