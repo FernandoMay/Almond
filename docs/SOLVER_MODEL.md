@@ -110,14 +110,11 @@ The verifier independently checks the resulting schedule for:
 - weekly hours;
 - availability;
 - coverage;
-- schedule validity;
-- cost consistency.
+- schedule validity.
 
 Future verifier checks will additionally cover:
 
 - peak coverage;
-- economic savings;
-- baseline comparison;
 - configurable shift rules.
 
 ## 11. Planned Objective Extensions
@@ -125,13 +122,16 @@ Future verifier checks will additionally cover:
 The following are deliberately not claimed as implemented by the current solver model. They are planned extensions required for the full challenge solution:
 
 1. explicit peak-hour coverage constraints;
-2. baseline/current-schedule comparison;
-3. overtime economics;
-4. overstaffing measurement;
-5. schedule-change penalties;
-6. configurable shift lengths and breaks;
-7. configurable objective weights;
-8. economic savings calculation in MXN.
+2. overtime economics;
+3. schedule-change penalties;
+4. configurable shift lengths and breaks;
+5. configurable objective weights.
+
+The baseline layer now provides a deterministic current schedule and measures
+its schedule-derived cost, coverage, understaffing, overstaffing, availability,
+and weekly-hour violations. The economics layer compares those values with the
+optimized schedule using the same hourly cost rules. Overtime premiums are not
+implemented.
 
 These extensions must preserve the hard constraints above.
 

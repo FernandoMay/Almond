@@ -60,11 +60,47 @@ class Verification:
 
 
 @dataclass(frozen=True)
+class BaselineAnalysis:
+    schedule: Schedule
+    cost_mxn: int
+    total_hours: int
+    availability_violations: tuple[str, ...]
+    weekly_hour_violations: tuple[str, ...]
+    coverage: Mapping[tuple[int, int], int]
+    coverage_percentage: float
+    understaffing: int
+    overstaffing: int
+    coverage_violations: tuple[str, ...] = field(default_factory=tuple)
+    overlap_violations: tuple[str, ...] = field(default_factory=tuple)
+    unknown_employee_violations: tuple[str, ...] = field(default_factory=tuple)
+
+    @property
+    def violations(self) -> tuple[str, ...]:
+        return (
+            self.availability_violations
+            + self.overlap_violations
+            + self.unknown_employee_violations
+            + self.weekly_hour_violations
+            + self.coverage_violations
+        )
+
+
+@dataclass(frozen=True)
 class Economics:
     baseline_cost_mxn: int
     optimized_cost_mxn: int
     avoided_cost_mxn: int
     savings_percentage: float
+    baseline_coverage_percentage: float = 0.0
+    optimized_coverage_percentage: float = 0.0
+    baseline_understaffing: int = 0
+    optimized_understaffing: int = 0
+    baseline_overstaffing: int = 0
+    optimized_overstaffing: int = 0
+
+    @property
+    def current_cost_mxn(self) -> int:
+        return self.baseline_cost_mxn
 
 
 @dataclass(frozen=True)

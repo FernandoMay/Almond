@@ -10,11 +10,11 @@ python -m pytest -q
 python -m almond
 ```
 
-The demo is generated from seed `40`; all costs are calculated from generated assignments and employee rates. The console output is JSON with MXN economics, coverage, violations, and constraint evaluations.
+The demo is generated from seed `40`; all costs are calculated from generated assignments and employee rates. The current comparison is a deterministic rotating 08:00–16:00 schedule from the same employees and availability, not a fully open schedule. The console output is JSON with current-versus-optimized MXN economics, coverage, violations, and constraint evaluations.
 
 ## Architecture
 
-`models.py` contains typed domain objects. `generator.py` creates deterministic data; `demand.py` derives staffing need; `baseline.py` creates a transparent full-open comparison; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares costs; `explain.py` exposes constraint results; `cli.py` composes the vertical slice.
+`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `cli.py` composes the vertical slice.
 
 ## Limitations
 
