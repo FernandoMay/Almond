@@ -10,7 +10,26 @@ def build_baseline(scenario: Scenario) -> Schedule:
 
 def schedule_cost(schedule: Schedule, scenario: Scenario) -> int:
     rates = {e.id: e.hourly_cost_mxn for e in scenario.employees}
-    return sum(a.hours * rates[a.employee_id] for a in schedule.assignments if a.employee_id in rates)
+    regular, overtime = hours_by_employee(schedule, scenario)
+    return sum(
+        regular[employee_id] * rates[employee_id]
+        + round(overtime[employee_id] * rates[employee_id] * scenario.optimization.overtime.multiplier)
+        for employee_id in rates
+        if employee_id in regular
+    )
+
+
+def hours_by_employee(schedule: Schedule, scenario: Scenario) -> tuple[dict[str, int], dict[str, int]]:
+    """Return regular and overtime hours using the scenario's weekly threshold."""
+    totals = schedule.hours_by_employee()
+    threshold = scenario.optimization.overtime.weekly_threshold
+    regular = {employee_id: min(hours, threshold) for employee_id, hours in totals.items()}
+    overtime = {employee_id: max(hours - threshold, 0) for employee_id, hours in totals.items()}
+    return regular, overtime
+
+
+def overtime_hours_by_employee(schedule: Schedule, scenario: Scenario) -> dict[str, int]:
+    return hours_by_employee(schedule, scenario)[1]
 
 
 def analyze_baseline(schedule: Schedule, scenario: Scenario) -> BaselineAnalysis:
@@ -57,6 +76,27 @@ def analyze_baseline(schedule: Schedule, scenario: Scenario) -> BaselineAnalysis
         for point in scenario.demand
         if coverage[point.day, point.hour] < point.demand
     )
+    peak_coverage = {
+        (point.day, point.hour): coverage[point.day, point.hour]
+        for point in scenario.demand
+        if point.peak
+    }
+    peak_understaffing = sum(
+        max(point.demand - coverage[point.day, point.hour], 0)
+        for point in scenario.demand
+        if point.peak
+    )
+    peak_coverage_violations = tuple(
+        f"peak coverage: day {point.day} hour {point.hour}"
+        for point in scenario.demand
+        if point.peak and coverage[point.day, point.hour] < point.demand
+    )
+    peak_required = sum(point.demand for point in scenario.demand if point.peak)
+    peak_covered = sum(
+        min(coverage[point.day, point.hour], point.demand)
+        for point in scenario.demand
+        if point.peak
+    )
     return BaselineAnalysis(
         schedule=schedule,
         cost_mxn=schedule_cost(schedule, scenario),
@@ -70,4 +110,9 @@ def analyze_baseline(schedule: Schedule, scenario: Scenario) -> BaselineAnalysis
         coverage_violations=coverage_violations,
         overlap_violations=tuple(overlap_violations),
         unknown_employee_violations=tuple(unknown_employee_violations),
+        peak_coverage=peak_coverage,
+        peak_understaffing=peak_understaffing,
+        peak_coverage_violations=peak_coverage_violations,
+        peak_required=peak_required,
+        peak_covered=peak_covered,
     )

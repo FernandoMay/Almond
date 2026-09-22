@@ -3,6 +3,15 @@ import random
 from .models import Assignment, DemandPoint, Employee, Scenario, Schedule
 
 
+DEMO_PEAK_START = 12
+DEMO_PEAK_END = 16
+
+
+def is_demo_peak_hour(hour: int) -> bool:
+    """Mark the explicit midday window [12:00, 16:00) as demo peak demand."""
+    return DEMO_PEAK_START <= hour < DEMO_PEAK_END
+
+
 def generate_demo(seed: int = 40) -> Scenario:
     """Build a stable, feasible, intentionally small week."""
     rng = random.Random(seed)
@@ -14,7 +23,15 @@ def generate_demo(seed: int = 40) -> Scenario:
     for day in range(7):
         for hour in range(8, 18):
             visitors = 10 + (hour - 8) * 2 + (day % 3) * 3 + rng.randint(0, 5)
-            demand.append(DemandPoint(day, hour, max(1, (visitors + 7) // 8), visitors))
+            demand.append(
+                DemandPoint(
+                    day,
+                    hour,
+                    max(1, (visitors + 7) // 8),
+                    visitors,
+                    peak=is_demo_peak_hour(hour),
+                )
+            )
     return Scenario(employees, tuple(demand))
 
 

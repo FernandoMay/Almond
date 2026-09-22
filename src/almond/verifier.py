@@ -22,8 +22,14 @@ def verify(schedule: Schedule, scenario: Scenario) -> Verification:
         if total > 40:
             violations.append(f"weekly hours: {employee_id}={total}")
     coverage = {}
+    peak_coverage = {}
+    peak_violations = []
     for point in scenario.demand:
         coverage[point.day, point.hour] = sum(1 for a in schedule.assignments if a.day == point.day and a.start <= point.hour < a.end)
+        if point.peak:
+            peak_coverage[point.day, point.hour] = coverage[point.day, point.hour]
         if coverage[point.day, point.hour] < point.demand:
             violations.append(f"coverage: day {point.day} hour {point.hour}")
-    return Verification(not violations, tuple(violations), coverage)
+            if point.peak:
+                peak_violations.append(f"peak coverage: day {point.day} hour {point.hour}")
+    return Verification(not violations, tuple(violations), coverage, peak_coverage, tuple(peak_violations))

@@ -1,5 +1,26 @@
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Mapping
+
+
+@dataclass(frozen=True)
+class ObjectiveWeights:
+    """Deterministic coefficients for the solver objective."""
+
+    labor_cost: int = 1
+    normal_uncovered_demand: int = 10_000
+    peak_uncovered_demand: int = 20_000
+
+
+@dataclass(frozen=True)
+class OvertimeConfig:
+    weekly_threshold: int = 40
+    multiplier: float = 1.5
+
+
+@dataclass(frozen=True)
+class OptimizationConfig:
+    objective_weights: ObjectiveWeights = field(default_factory=ObjectiveWeights)
+    overtime: OvertimeConfig = field(default_factory=OvertimeConfig)
 
 
 @dataclass(frozen=True)
@@ -15,6 +36,7 @@ class DemandPoint:
     hour: int
     demand: int
     visitors: int
+    peak: bool = False
 
 
 @dataclass(frozen=True)
@@ -24,6 +46,7 @@ class Scenario:
     days: int = 7
     open_start: int = 8
     open_end: int = 18
+    optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
 
 
 @dataclass(frozen=True)
@@ -57,6 +80,8 @@ class Verification:
     valid: bool
     violations: tuple[str, ...]
     coverage: Mapping[tuple[int, int], int]
+    peak_coverage: Mapping[tuple[int, int], int] = field(default_factory=dict)
+    peak_violations: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True)
@@ -73,6 +98,15 @@ class BaselineAnalysis:
     coverage_violations: tuple[str, ...] = field(default_factory=tuple)
     overlap_violations: tuple[str, ...] = field(default_factory=tuple)
     unknown_employee_violations: tuple[str, ...] = field(default_factory=tuple)
+    peak_coverage: Mapping[tuple[int, int], int] = field(default_factory=dict)
+    peak_understaffing: int = 0
+    peak_coverage_violations: tuple[str, ...] = field(default_factory=tuple)
+    peak_required: int = 0
+    peak_covered: int = 0
+
+    @property
+    def peak_coverage_percentage(self) -> float:
+        return self.peak_covered / self.peak_required * 100 if self.peak_required else 0.0
 
     @property
     def violations(self) -> tuple[str, ...]:
@@ -82,6 +116,7 @@ class BaselineAnalysis:
             + self.unknown_employee_violations
             + self.weekly_hour_violations
             + self.coverage_violations
+            + self.peak_coverage_violations
         )
 
 
@@ -97,6 +132,10 @@ class Economics:
     optimized_understaffing: int = 0
     baseline_overstaffing: int = 0
     optimized_overstaffing: int = 0
+    baseline_regular_hours: Mapping[str, int] = field(default_factory=dict)
+    baseline_overtime_hours: Mapping[str, int] = field(default_factory=dict)
+    optimized_regular_hours: Mapping[str, int] = field(default_factory=dict)
+    optimized_overtime_hours: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def current_cost_mxn(self) -> int:

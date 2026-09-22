@@ -1,4 +1,4 @@
-from .baseline import analyze_baseline, schedule_cost
+from .baseline import analyze_baseline, hours_by_employee, schedule_cost
 from .models import Economics, Scenario, Schedule
 
 
@@ -8,6 +8,8 @@ def compare(baseline: Schedule, optimized: Schedule, scenario: Scenario) -> Econ
     opt = schedule_cost(optimized, scenario)
     avoided = base - opt
     optimized_analysis = analyze_baseline(optimized, scenario)
+    baseline_regular, baseline_overtime = hours_by_employee(baseline, scenario)
+    optimized_regular, optimized_overtime = hours_by_employee(optimized, scenario)
     return Economics(
         base,
         opt,
@@ -19,4 +21,8 @@ def compare(baseline: Schedule, optimized: Schedule, scenario: Scenario) -> Econ
         optimized_analysis.understaffing,
         baseline_analysis.overstaffing,
         optimized_analysis.overstaffing,
+        baseline_regular,
+        baseline_overtime,
+        optimized_regular,
+        optimized_overtime,
     )

@@ -7,5 +7,14 @@ def required_staff(visitors: int, service_minutes: int = 8, productive_minutes: 
     return max(0, (visitors * service_minutes + productive_minutes - 1) // productive_minutes)
 
 
-def calculate_demand(visitors_by_hour: list[tuple[int, int, int]], service_minutes: int = 8) -> tuple[DemandPoint, ...]:
-    return tuple(DemandPoint(day, hour, required_staff(visitors, service_minutes), visitors) for day, hour, visitors in visitors_by_hour)
+def calculate_demand(
+    visitors_by_hour: list[tuple[int, int, int]],
+    service_minutes: int = 8,
+    peak_hours: set[int] | frozenset[int] | None = None,
+) -> tuple[DemandPoint, ...]:
+    """Calculate demand, optionally marking a configured set of peak hours."""
+    peak_hours = peak_hours or frozenset()
+    return tuple(
+        DemandPoint(day, hour, required_staff(visitors, service_minutes), visitors, hour in peak_hours)
+        for day, hour, visitors in visitors_by_hour
+    )
