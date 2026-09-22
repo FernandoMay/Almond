@@ -10,6 +10,7 @@ The project used bounded AI-agent work units with human review between them:
 | Verification | Independently inspect the generated schedule and verifier behavior. | Accepted the finding that overlapping assignments were not rejected and required a focused correction. |
 | Baseline/economics | Add a deterministic current schedule and schedule-derived Current vs Optimized economics. | Reviewed the negative savings result as an honest coverage tradeoff rather than accepting a fabricated 8\% claim. |
 | Baseline hardening | Add overlap and unknown-employee diagnostics and remove an unsupported documentation claim. | Re-ran the full test suite and CLI before commit. |
+| Peak/overtime/objective work unit | Add explicit deterministic peak marking and coverage, configurable objective weights, and regular/overtime economics. | Required separate peak metrics, overtime regression coverage, byte-identical CLI runs, and honest savings reporting. |
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes.
 
@@ -20,3 +21,7 @@ The human owner must validate legal interpretation, service-time assumptions, wa
 ## Decisive solver prompt
 
 “Given hourly demand and employee availability, choose binary hourly assignments that minimize MXN labor cost plus uncovered-demand penalty. Enforce availability, at most one contiguous interval per employee per day, and no more than 40 weekly hours. Return a schedule that an independent verifier can inspect.”
+
+## Current work-unit decisions
+
+The demo marks the explicit midday interval `[12:00, 16:00)` as peak. Peak coverage is modeled as a hard constraint when the model is feasible; an infeasible hard peak model is retried with bounded shortage slack, which remains visible and receives the peak objective weight. Objective weights are scenario data: labor `1`, normal shortage `10000`, and peak shortage `20000`. Overtime pricing uses a configurable weekly threshold and multiplier, while the optimizer's 40-hour weekly cap remains hard.

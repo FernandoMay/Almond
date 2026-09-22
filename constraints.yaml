@@ -50,11 +50,27 @@ constraints:
   - id: operational.peak_coverage
     kind: operational
     hard: true
-    rule: Peak-hour coverage must be preserved in the full challenge model.
-    value: configurable peak staffing requirement
+    rule: Explicitly marked peak demand buckets are hard-covered when feasible; infeasible models fall back to bounded, visible peak shortage.
+    value: DemandPoint.peak with deterministic demo window 12:00-16:00
     source: Challenge acceptance criterion
     removal_impact: Removing peak coverage can create misleading savings by reducing staffing during high-demand periods.
-    status: planned
+    status: implemented
+
+  - id: financial.overtime_economics
+    kind: financial
+    hard: false
+    rule: Weekly hours above the configured threshold are priced at the configured overtime multiplier.
+    value: threshold 40 hours, multiplier 1.5 by default
+    source: Jornada40 overtime economics work unit
+    removal_impact: Removing this rule understates the cost of arbitrary schedules that exceed regular weekly hours.
+
+  - id: product.objective_weights
+    kind: product
+    hard: false
+    rule: Labor cost, normal uncovered demand, and peak uncovered demand use explicit scenario configuration.
+    value: 1, 10000, and 20000 by default
+    source: Explainable optimization acceptance criterion
+    removal_impact: Removing explicit weights makes tradeoffs opaque and prevents deterministic scenario tuning.
 
   - id: financial.minimum_savings
     kind: product
@@ -63,4 +79,4 @@ constraints:
     value: 8%
     source: Challenge acceptance criterion
     removal_impact: Removing this target changes the business acceptance criterion but does not affect schedule feasibility.
-    status: planned
+    status: target

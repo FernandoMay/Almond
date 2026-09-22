@@ -37,7 +37,8 @@
 \toprule
 Version & Date & Description\\
 \midrule
-0.1.0 & 2026-09-21 & Initial technical report for commit \texttt{95ca2cf}.\\
+0.1.0 & 2026-09-21 & Initial technical report for the previous baseline/economics revision, commit \texttt{95ca2cf}.\\
+0.2.0 & 2026-09-21 & Added peak coverage, overtime economics, and objective weights, commit \texttt{4831485}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -54,9 +55,9 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.1.0\\
-As-of commit: & \texttt{95ca2cf}\\
-Date: & 2026-09-21\\
+Version: & 0.2.0\\
+As-of revision: & \texttt{4831485}\\
+Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
 \vfill
@@ -69,7 +70,7 @@ Repository: & \repo
 \section{Executive summary}
 Almond is the backend and core-engine MVP for Jornada40. It transforms deterministic hourly visitor demand, employee availability, and MXN hourly rates into an explainable schedule. The implementation is a small Python vertical slice: data generation, demand calculation, a CP-SAT optimizer, independent verification, baseline analysis, schedule-derived economics, and a JSON command-line demo.
 
-\callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled coverage with an optimized cost of 16,402 MXN. Its generated current schedule costs 15,680 MXN and covers 74.27\% of demand, so the honest cost delta is \textbf{-722 MXN avoided} or \textbf{-4.6\% savings}. The result is not presented as an artificial 8\% saving: the current model buys additional coverage.}
+\callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled and peak coverage with an optimized cost of 16,402 MXN. Its generated current schedule costs 15,680 MXN, covers 74.27\% overall and 98.08\% at peak, so the honest cost delta is \textbf{-722 MXN avoided} or \textbf{-4.6\% savings}. The result is not presented as an artificial 8\% saving: the optimized model buys additional coverage.}
 
 \subsection{Current status}
 \begin{tabular}{p{0.28\linewidth}p{0.62\linewidth}}
@@ -79,8 +80,8 @@ Area & Status\\
 Deterministic scenario & \implemented: seed 40, seven days, ten opening hours per day, seven employees.\\
 Demand and scheduling & \implemented: integer hourly demand and OR-Tools CP-SAT candidate schedule.\\
 Hard constraints & \implemented: availability, one contiguous daily interval, and at most 40 weekly hours.\\
-Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, and coverage checks.\\
-Economics & \implemented: schedule-derived MXN cost, coverage, understaffing, overstaffing, and delta.\\
+Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, normal coverage, and separate peak-coverage checks.\\
+Economics & \implemented: schedule-derived MXN cost, regular/overtime hours, coverage, peak coverage, understaffing, overstaffing, and delta.\\
 Product surface & \implemented: CLI JSON; API, UI, persistence, and deployment are \planned.\\
 \bottomrule
 \end{tabular}
@@ -101,7 +102,7 @@ The MVP accepts synthetic hourly visitors, employee availability, and fixed hour
 \end{itemize}
 
 \subsection{Out of scope at this commit}
-Breaks, skills, overtime premiums, absences, payroll integration, persistence, API, UI, deployment, configurable shift rules, and configurable objective weights are \planned. Peak-specific coverage is also \planned; the implemented model uses every modeled demand bucket.
+Breaks, skills, absences, payroll integration, persistence, API, UI, deployment, and configurable shift rules are \planned. Explicit peak coverage, overtime economics, and configurable objective weights are implemented in this work unit.
 
 \section{Architecture and module responsibilities}
 The engine is a functional pipeline:
@@ -137,8 +138,8 @@ Domain objects do not depend on OR-Tools. This separation makes the verifier ind
 The principal immutable records are:
 \begin{itemize}
   \item \texttt{Employee(id, hourly\_cost\_mxn, availability)};
-  \item \texttt{DemandPoint(day, hour, demand, visitors)};
-  \item \texttt{Scenario(employees, demand, days, open\_start, open\_end)};
+\item \texttt{DemandPoint(day, hour, demand, visitors, peak)};
+  \item \texttt{Scenario(employees, demand, days, open\_start, open\_end, optimization)};
   \item \texttt{Assignment(employee\_id, day, start, end)}, with end exclusive;
   \item \texttt{Schedule(assignments)}, with per-employee hour aggregation.
 \end{itemize}
@@ -154,6 +155,8 @@ R_{d,h}=\max\left(1,\left\lceil\frac{8V_{d,h}}{60}\right\rceil\right).
 Hours are integer buckets; all intervals use $[\text{start},\text{end})$ semantics and all costs are integer MXN amounts.
 
 The generated current schedule rotates four employees per day through 08:00--16:00. The last two opening hours are intentionally uncovered by this simple fixed-shift baseline. This is a deterministic operational comparison, not a fully open or presumed-optimal schedule.
+
+The demo's peak rule is explicit and testable: every demand bucket with $12\le h<16$ is marked peak; all other modeled hours are normal.
 
 \section{Solver formulation}
 \subsection{Decision variables}
@@ -183,23 +186,25 @@ The slack variable makes shortage explicit and bounded rather than allowing a hi
 \subsection{Objective and deterministic settings}
 The implemented objective is
 \[
-\min\left(\sum_{e,d,h}x_{e,d,h}c_e+10{,}000\sum_{d,h}u_{d,h}\right),
+\min\left(w_l\sum_{e,d,h}x_{e,d,h}c_e+w_n\sum_{(d,h)\notin P}u_{d,h}+w_p\sum_{(d,h)\in P}u_{d,h}\right),
 \]
-where $c_e$ is the employee's hourly MXN rate. The coefficient 10,000 strongly prioritizes coverage before labor cost in this demo. OR-Tools CP-SAT is configured with \texttt{num\_search\_workers = 1} and \texttt{random\_seed = 40}. The CLI reports the exact solver status; the current run is \texttt{OPTIMAL}.
+where $c_e$ is the employee's hourly MXN rate, $P$ is the explicit peak set, and the default weights are $(w_l,w_n,w_p)=(1,10000,20000)$. Peak buckets are hard-covered when feasible; an infeasible hard model falls back to bounded explicit slack. OR-Tools CP-SAT is configured with \texttt{num\_search\_workers = 1} and \texttt{random\_seed = 40}. The CLI reports the exact solver status; the current run is \texttt{OPTIMAL}.
+
+For arbitrary schedule economics, with weekly threshold $T$ and multiplier $m$, regular hours are $\min(H_e,T)$, overtime hours are $\max(H_e-T,0)$, and employee cost is $\text{regular}\times c_e+\text{overtime}\times c_e\times m$. Defaults are $T=40$ and $m=1.5$; the optimizer retains a hard 40-hour cap.
 
 \subsection{Implemented versus planned capabilities}
 \begin{tabular}{p{0.34\linewidth}p{0.51\linewidth}}
 \toprule
-Capability & Status at \texttt{95ca2cf}\\
+Capability & Status at the 2026-09-22 work unit\\
 \midrule
 Availability, weekly cap, daily contiguity & \implemented hard constraints.\\
 Hourly coverage with bounded uncovered demand & \implemented constraint and penalty.\\
 Current schedule and schedule-derived economics & \implemented.\\
-Peak-hour coverage target & \planned.\\
-Overtime premiums and overtime economics & \planned.\\
+Peak-hour coverage target & \implemented hard-first with bounded visible fallback.\\
+Overtime premiums and overtime economics & \implemented with configurable threshold and multiplier.\\
 Schedule-change penalties & \planned.\\
 Configurable shift lengths and breaks & \planned.\\
-Configurable objective weights & \planned.\\
+Configurable objective weights & \implemented for labor, normal shortage, and peak shortage.\\
 \bottomrule
 \end{tabular}
 
@@ -234,7 +239,10 @@ Metric & Current & Optimized\\
 \midrule
 Cost (MXN) & 15,680 & 16,402\\
 Coverage & 74.27\% & 100.00\%\\
+Peak coverage & 98.08\% & 100.00\%\\
 Understaffing & 62 & 0\\
+Peak understaffing & 2 & 0\\
+Peak coverage violations & 2 & 0\\
 Overstaffing & 45 & 0\\
 Verifier violations & 16 coverage & 0\\
 \midrule
@@ -244,7 +252,7 @@ Savings & \multicolumn{2}{c}{-4.6\%}\\
 \end{tabular}
 \end{table}
 
-The flow is intentionally explicit: generate one scenario; construct the rotating current schedule; optimize the same scenario; independently analyze and verify the optimized schedule; then compare schedule-derived costs. The negative result is honest. The current schedule spends less because it leaves demand uncovered, while the optimizer spends 722 MXN more to reach complete modeled coverage. Reporting an invented 8\% saving would confuse a cost reduction with a service-level improvement and would violate the project's requirement that savings be computed from assignments and rates.
+The flow is intentionally explicit: generate one scenario; construct the rotating current schedule; optimize the same scenario; independently analyze and verify the optimized schedule; then compare schedule-derived costs. The CLI also reports objective weights $(1,10000,20000)$, overtime threshold 40, multiplier 1.5, and zero regular-schedule overtime for both current and optimized demo schedules. The negative result is honest. The current schedule spends less because it leaves demand uncovered, while the optimizer spends 722 MXN more to reach complete modeled coverage. Reporting an invented 8\% saving would confuse a cost reduction with a service-level improvement and would violate the project's requirement that savings be computed from assignments and rates.
 
 % Future maintainers: update this table and the executive callout only after re-running the pinned demo command.
 
@@ -261,16 +269,16 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains ten tests, and the observed result at this commit is:
+The repository test suite contains sixteen tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
-..........                                                               [100%]
+................                                                         [100%]
 \end{verbatim}
 The executable demo was also run as:
 \begin{verbatim}
 .venv/bin/almond
 \end{verbatim}
-It returned JSON with \texttt{solver\_status: OPTIMAL}, the metrics in Table 3, empty optimized violations, and all three reported constraint evaluations true. PDF verification for this report is specified in Section~\ref{sec:repro}.
+It returned JSON with \texttt{solver\_status: OPTIMAL}, the metrics in Table 3, empty optimized violations, zero optimized overtime, explicit weights $(1,10000,20000)$, and all four reported constraint evaluations true. PDF verification for this report is specified in Section~\ref{sec:repro}.
 
 \section{Constraint registry and traceability}
 \begin{longtable}{p{0.19\linewidth}p{0.22\linewidth}p{0.12\linewidth}p{0.13\linewidth}p{0.24\linewidth}}
@@ -286,16 +294,19 @@ Constraint & Source & Kind & Hardness & Removal impact\\
 Availability & \texttt{optimizer.py}; \texttt{verifier.py} & Feasibility & Hard & Employees could be scheduled outside declared windows.\\
 Weekly hours & \texttt{optimizer.py}; \texttt{verifier.py} & Feasibility & Hard & A schedule could exceed the 40-hour cap.\\
 Hourly coverage & \texttt{optimizer.py}; \texttt{verifier.py} & Service level & Hard in verifier; shortage represented by $u$ in solver & Coverage failures could be hidden or accepted without evidence.\\
+Peak coverage & \texttt{optimizer.py}; \texttt{verifier.py}; \texttt{baseline.py} & Service level & Hard-first; bounded fallback & Peak shortages could be hidden inside overall coverage.\\
 Uncovered demand bound & \texttt{optimizer.py} & Slack accounting & Bounded & Shortage could become unbounded or distort objective behavior.\\
 Daily contiguity & \texttt{optimizer.py} & Shift shape & Hard in model & Split shifts could be emitted as one assignment.\\
 Overlap detection & \texttt{verifier.py}; \texttt{baseline.py} & Data validity & Hard for verification & Duplicate work would inflate apparent coverage and hours.\\
 Known employee & \texttt{verifier.py}; \texttt{baseline.py} & Referential validity & Hard for verification & Unknown IDs would become unaudited schedule data.\\
 Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Derived, not solver-hard & Economics could be disconnected from actual assignments.\\
+Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Derived, not solver-hard & Schedules above the regular threshold could be underpriced.\\
+Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
 \bottomrule
 \end{longtable}
 
 \section{AI-assisted engineering log}
-The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; and a later implementation writer added the current-schedule baseline and schedule-derived economics. A final hardening pass added baseline overlap and unknown-employee diagnostics and removed an unsupported documentation claim.
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; and later implementation writers added baseline economics and this peak/overtime/objective work unit. The latest unit adds deterministic peak marking, hard-first peak coverage with visible fallback, configurable objective coefficients, and overtime pricing without changing the hard 40-hour optimizer cap.
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
 
@@ -315,14 +326,16 @@ Given hourly demand and employee availability, choose binary hourly assignments 
   \item Use deterministic seed and single-worker CP-SAT settings for reproducible demos.
   \item Make uncovered demand explicit and penalized rather than silently relaxing coverage.
   \item Compare against a plausible current schedule, not a fabricated full-open schedule.
-  \item Compute costs from generated assignments and employee rates.
+  \item Compute costs from generated assignments and employee rates, including configured overtime premiums for arbitrary schedules.
+  \item Keep peak coverage explicit and separately auditable from normal coverage.
+  \item Store objective weights in scenario configuration rather than embedding an 8\% savings target.
 \end{itemize}
 
 \subsection{Limitations and risks}
-The synthetic scenario is not a forecast. Service time is fixed at eight minutes, each employee has one generic role, rates are fixed, and no break or overtime policy exists. The large finite penalty is a modeling choice, not a legal service-level guarantee. The baseline's coverage loss is intentional, so cost-only comparisons are misleading without coverage. Finally, the CLI is not an authorization boundary for production schedules.
+The synthetic scenario is not a forecast. Service time is fixed at eight minutes, each employee has one generic role, rates are fixed, and overtime settings are modeling inputs rather than payroll approval. The finite shortage weights are modeling choices, not legal service-level guarantees. The baseline's coverage loss is intentional, so cost-only comparisons are misleading without coverage. Finally, the CLI is not an authorization boundary for production schedules.
 
 \subsection{Roadmap}
-The next engineering increments should add peak coverage requirements, overtime premiums, breaks, configurable shift rules, schedule-change penalties, and objective weights while preserving independent verification. API and UI layers should consume domain results rather than recompute validity or savings. Persistence and deployment controls should follow once data contracts and operational approvals exist. A defensible $\ge8\%$ savings scenario should be created only by changing explicit scenario inputs or operational assumptions, documenting the change, and verifying that coverage and constraints remain acceptable; it must never be back-solved from a desired headline.
+The next engineering increments should add breaks, configurable shift rules, and schedule-change penalties while preserving independent verification. API and UI layers should consume domain results rather than recompute validity or savings. Persistence and deployment controls should follow once data contracts and operational approvals exist. A defensible $\ge8\%$ savings scenario should be created only by changing explicit scenario inputs or operational assumptions, documenting the change, and verifying that coverage and constraints remain acceptable; it must never be back-solved from a desired headline.
 
 \section{Reproducibility}
 \label{sec:repro}
@@ -336,7 +349,7 @@ pdflatex -interaction=nonstopmode -halt-on-error \
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The report is tied to commit \texttt{95ca2cf}; later code changes require re-running both the demo and the report's metric claims.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{4831485}; later code changes require re-running both the demo and the report's metric claims.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -352,19 +365,19 @@ Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{95ca2cf} (repository history).\\
+Exact implementation revision & Git commit \texttt{4831485}.\\
 \bottomrule
 \end{longtable}
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{95ca2cf}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{95ca2cf}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{95ca2cf}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{95ca2cf}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{95ca2cf}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{95ca2cf}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{4831485}.
 \end{enumerate}
 
 \revisionhistory

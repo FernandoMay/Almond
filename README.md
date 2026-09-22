@@ -10,7 +10,7 @@ python -m pytest -q
 python -m almond
 ```
 
-The demo is generated from seed `40`; all costs are calculated from generated assignments and employee rates. The current comparison is a deterministic rotating 08:00–16:00 schedule from the same employees and availability, not a fully open schedule. The console output is JSON with current-versus-optimized MXN economics, coverage, violations, and constraint evaluations.
+The demo is generated from seed `40`; peak buckets are the explicit midday window `[12:00, 16:00)`. All costs are calculated from generated assignments and employee rates. The current comparison is a deterministic rotating 08:00–16:00 schedule from the same employees and availability, not a fully open schedule. The console output is JSON with current-versus-optimized MXN economics, separate peak coverage, violations, objective weights, overtime settings, and constraint evaluations.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ The demo is generated from seed `40`; all costs are calculated from generated as
 
 ## Limitations
 
-This MVP models one role, integer hourly demand, fixed hourly rates, and a single contiguous interval per employee per day. It does not yet model breaks, skills, overtime premiums, absences, payroll, persistence, or a UI. Uncovered demand is reported rather than silently accepted.
+This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, and a UI remain out of scope. Uncovered demand is reported rather than silently accepted.
 
 ## AI-first engineering notes
 

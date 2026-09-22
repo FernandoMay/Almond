@@ -18,6 +18,8 @@ For each modeled demand bucket:
 
 `u[d,h]` represents uncovered demand. It is bounded by the demand value for that bucket.
 
+Each demand point also carries an explicit boolean `peak` marker. The demo marks the documented interval `[12:00, 16:00)` as peak.
+
 ## 3. Weekly Hours
 
 For every employee:
@@ -51,6 +53,8 @@ where:
 
 The current implementation permits an infeasible coverage requirement to be represented explicitly through `u`, rather than silently producing an invalid schedule.
 
+For every peak bucket, the optimizer first adds `Σe x[e,d,h] ≥ R[d,h]` as a hard constraint. If that model is infeasible, it deterministically rebuilds the model with bounded `u[d,h]` slack. The verifier and baseline expose peak coverage and peak violations separately.
+
 ## 6. Daily Contiguity
 
 The current implementation models each employee's scheduled hours for a day as one contiguous interval.
@@ -67,17 +71,15 @@ from being represented as one employee's modeled daily interval.
 
 The current MVP minimizes:
 
-`labor_cost + uncovered_demand_penalty`
+`w_labor × labor_cost + w_normal × normal_uncovered + w_peak × peak_uncovered`
 
 where:
 
 `labor_cost = Σ(e,d,h) x[e,d,h] × hourly_cost[e]`
 
-and uncovered demand receives a large penalty.
+where the scenario carries explicit deterministic weights. Defaults are `w_labor = 1`, `w_normal = 10000`, and `w_peak = 20000`; peak shortage is penalized more strongly than normal shortage.
 
-The current implementation uses a penalty coefficient of `10000`.
-
-This means coverage is prioritized before labor cost in the current demo model.
+This means coverage is prioritized before labor cost in the current demo model while preserving a visible distinction for peak shortage.
 
 ## 8. Solver Configuration
 
@@ -110,28 +112,33 @@ The verifier independently checks the resulting schedule for:
 - weekly hours;
 - availability;
 - coverage;
+- peak coverage and peak violations;
 - schedule validity.
 
-Future verifier checks will additionally cover:
+## 11. Overtime economics
 
-- peak coverage;
-- configurable shift rules.
+The optimizer retains the hard 40-hour weekly cap, while economics can analyze arbitrary schedules. For configured threshold `T` and multiplier `m`:
 
-## 11. Planned Objective Extensions
+`regular[e] = min(H[e], T)`
 
-The following are deliberately not claimed as implemented by the current solver model. They are planned extensions required for the full challenge solution:
+`overtime[e] = max(H[e] - T, 0)`
 
-1. explicit peak-hour coverage constraints;
-2. overtime economics;
-3. schedule-change penalties;
-4. configurable shift lengths and breaks;
-5. configurable objective weights.
+`cost[e] = regular[e] × rate[e] + overtime[e] × rate[e] × m`
+
+The defaults are `T = 40` and `m = 1.5`. Overtime is reported per employee for baseline and optimized schedules.
+
+## 12. Remaining Objective Extensions
+
+The following remain planned extensions:
+
+1. schedule-change penalties;
+2. configurable shift lengths and breaks.
 
 The baseline layer now provides a deterministic current schedule and measures
-its schedule-derived cost, coverage, understaffing, overstaffing, availability,
-and weekly-hour violations. The economics layer compares those values with the
-optimized schedule using the same hourly cost rules. Overtime premiums are not
-implemented.
+its schedule-derived cost, coverage, peak coverage, understaffing, overstaffing,
+availability, and weekly-hour violations. The economics layer compares those
+values with the optimized schedule using the same hourly cost rules and reports
+regular versus overtime hours.
 
 These extensions must preserve the hard constraints above.
 

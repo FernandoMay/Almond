@@ -1,11 +1,11 @@
 # Data model
 
 - `Employee`: id, MXN hourly cost, and per-day `[start, end)` availability.
-- `DemandPoint`: day, hour, visitor count, and required integer staff.
-- `Scenario`: employees, demand buckets, modeled days, and opening hours.
+- `DemandPoint`: day, hour, visitor count, required integer staff, and explicit peak marker.
+- `Scenario`: employees, demand buckets, modeled days, opening hours, objective weights, and overtime configuration.
 - `Assignment`: employee, day, and contiguous `[start, end)` interval.
 - `Schedule`: assignments with per-employee hour aggregation.
-- `Verification`: validity, violations, and observed coverage by bucket.
-- `Economics`: baseline cost, optimized cost, avoided cost, and percentage savings.
+- `Verification`: validity, violations, observed coverage, and separate peak coverage evidence.
+- `Economics`: baseline/optimized costs, avoided cost, percentage savings, and regular/overtime hours.
 
 Hours are integer buckets. End times are exclusive. Costs are MXN integer amounts.
