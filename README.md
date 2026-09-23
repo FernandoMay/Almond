@@ -8,8 +8,9 @@ Almond is the backend/core-engine MVP for Jornada40: it turns hourly demand into
 python -m pip install -e "."
 python -m pytest -q
 python -m almond
-# Optional local API
+# Optional local API and dashboard
 .venv/bin/almond-api
+# or: uvicorn almond.api:app --reload
 ```
 
 The demo is generated from seed `40`; peak buckets are the explicit midday window `[12:00, 16:00)`. All costs are calculated from generated assignments and employee rates. The current comparison is a configurable deterministic policy: a five-person fixed staffing floor works 08:00–18:00 every day, with round-robin rotation across the same employees and availability. This assumption provides full demand coverage but deliberately measures the overstaffing and overtime of a rigid operating policy. The console output is JSON with current-versus-optimized MXN economics, regular/overtime hours, separate peak coverage, violations, objective weights, overtime settings, and constraint evaluations.
@@ -43,6 +44,10 @@ The first FastAPI product surface is implemented and reuses the CLI composition 
 - `POST /v1/optimize/csv` — accepts `employees.csv`, `availability.csv`, and `demand.csv` multipart uploads plus `days`, `opening_hour`, and `closing_hour` form fields. Exact headers are `id,hourly_rate_mxn`, `employee_id,day,start,end`, and `day,hour,visitors,required_staff,peak`; peak values are `true` or `false`.
 - `GET /v1/demo/schedule.csv` and `POST /v1/optimize/schedule.csv` — export only the optimized schedule as deterministic `text/csv` with header `employee_id,day,start,end,hours`.
 
+### Local operations dashboard
+
+With the API running, open `http://127.0.0.1:8000/`. The dependency-light dashboard runs the deterministic demo through `GET /v1/demo`, uploads one validated `.json` scenario through `POST /v1/optimize/json-file`, and presents current-versus-optimized MXN cost, avoided cost, savings percentage, overall and peak coverage, overstaffing, overtime, constraint explanations, and verifier status. Demo results can download the deterministic schedule from `GET /v1/demo/schedule.csv`. Uploaded scenarios remain stateless in the browser; their schedule download is intentionally unavailable in this UI and remains available through the API or CLI.
+
 Example request:
 
 ```json
@@ -56,15 +61,15 @@ Example request:
 
 Objective weights, overtime settings, and baseline policy are optional. The endpoint rejects empty domain collections, duplicate employee IDs, duplicate demand slots, and values outside the modeled horizon with `422`. The endpoint translates the request into immutable domain objects and uses the same baseline, optimizer, verifier, economics, and explanation path as the CLI and demo API. Repeating the same request is deterministic.
 
-Uploaded files are statelessly parsed; duplicate IDs/slots, unknown employees, missing headers, empty files, invalid ranges, malformed JSON, and wrong extensions are rejected with clear 4xx responses. Repeating the same input produces the same result and schedule bytes. The API is a local/runtime surface only. Persistence, authentication, UI, deployment, and asynchronous job storage remain planned; no deployment topology is implemented or implied.
+Uploaded files are statelessly parsed; duplicate IDs/slots, unknown employees, missing headers, empty files, invalid ranges, malformed JSON, and wrong extensions are rejected with clear 4xx responses. Repeating the same input produces the same result and schedule bytes. The API and dashboard are local/runtime surfaces only. Persistence, authentication, deployment, asynchronous job storage, and production hardening remain planned; no deployment topology is implemented or implied.
 
 ## Architecture
 
-`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `io.py` parses JSON/CSV inputs and serializes schedule CSV; `cli.py` composes both the no-argument demo and operational file workflow; `api.py` exposes the versioned HTTP boundary by calling that same composition.
+`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `io.py` parses JSON/CSV inputs and serializes schedule CSV; `cli.py` composes both the no-argument demo and operational file workflow; `api.py` exposes the versioned HTTP boundary and serves `web/index.html` plus static assets; `web/app.js` only fetches API results and renders presentation state.
 
 ## Limitations
 
-This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, authentication, UI, deployment, and asynchronous job storage remain planned. The operational CLI is a local batch boundary, not an authorization or job-storage service. Uncovered demand is reported rather than silently accepted.
+This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, authentication, deployment, asynchronous job storage, and production hardening remain planned. The static dashboard is a local presentation boundary, not a persistence, authorization, or job-storage service. Uncovered demand is reported rather than silently accepted.
 
 ## AI-first engineering notes
 

@@ -66,6 +66,15 @@ constraints:
     removal_impact: Operators would need an HTTP runtime for repeatable file-based optimization and could lose deterministic artifact contracts.
     status: implemented
 
+  - id: product.local_operations_dashboard
+    kind: product
+    hard: true
+    rule: The local dashboard presents verified business metrics, constraint explanations, and validation state, and supports demo execution plus JSON scenario upload without duplicating domain logic.
+    value: GET /; /static assets; GET /v1/demo; POST /v1/optimize/json-file; GET /v1/demo/schedule.csv
+    source: Local operations dashboard work unit
+    removal_impact: Operators would need to inspect raw API or CLI output to understand current-versus-optimized cost and schedule validity.
+    status: implemented
+
   - id: product.validated_store_input
     kind: product
     hard: true

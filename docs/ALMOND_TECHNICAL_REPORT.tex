@@ -43,6 +43,7 @@ Version & Date & Description\\
 0.5.0 & 2026-09-22 & Added validated new-store input at \texttt{POST /v1/optimize}, shared scenario composition, API tests, and reproducibility evidence, commit \texttt{bf18756}.\\
 0.6.0 & 2026-09-23 & Added stateless JSON/CSV ingestion and deterministic optimized schedule CSV export, commit \texttt{406b004}.\\
 0.7.0 & 2026-09-23 & Added the operational file CLI, tests, and documentation, commit \texttt{375d930}.\\
+0.8.0 & 2026-09-23 & Added the FastAPI-served local operations dashboard, route/static tests, and synchronized documentation, commit \texttt{590b1bc}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -59,9 +60,9 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.7.0\\
-As-of revision: & \texttt{375d930}\\
-Date: & 2026-09-22\\
+Version: & 0.8.0\\
+As-of revision: & \texttt{590b1bc}\\
+Date: & 2026-09-23\\
 Repository: & \repo
 \end{tabular}
 \vfill
@@ -72,7 +73,7 @@ Repository: & \repo
 \newpage
 
 \section{Executive summary}
-Almond is the backend and core-engine MVP for Jornada40. It transforms deterministic hourly visitor demand, employee availability, and MXN hourly rates into an explainable schedule. The implementation is a small Python vertical slice: data generation, demand calculation, a CP-SAT optimizer, independent verification, baseline analysis, schedule-derived economics, and a JSON command-line demo.
+Almond is the backend, core-engine, and local operations-dashboard MVP for Jornada40. It transforms deterministic hourly visitor demand, employee availability, and MXN hourly rates into an explainable schedule. The implementation is a small Python vertical slice: data generation, demand calculation, a CP-SAT optimizer, independent verification, baseline analysis, schedule-derived economics, a JSON command-line demo, and a static FastAPI-served UI.
 
 \callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled and peak coverage with an optimized cost of 16,402 MXN. Its documented current policy costs 26,950 MXN, also covers 100\% overall and at peak, and records 109 overstaffed person-hours plus 70 overtime hours. The schedule-derived delta is \textbf{10,548 MXN avoided} or \textbf{39.14\% savings}; the optimized schedule has no verifier violations. The challenge target is \textbf{at least 8\%}, while this implementation computes the result from the two schedules and configured rates.}
 
@@ -86,7 +87,7 @@ Demand and scheduling & \implemented: integer hourly demand and OR-Tools CP-SAT 
 Hard constraints & \implemented: availability, one contiguous daily interval, and at most 40 weekly hours.\\
 Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, normal coverage, and separate peak-coverage checks.\\
 Economics & \implemented: schedule-derived MXN cost, regular/overtime hours, coverage, peak coverage, understaffing, overstaffing, and delta.\\
-Product surface & \implemented: CLI JSON and versioned local FastAPI routes; UI, persistence, and deployment are \planned.\\
+Product surface & \implemented: CLI JSON, versioned local FastAPI routes, and a static dashboard at \texttt{GET /}; persistence, authentication, deployment, and hardening are \planned.\\
 \bottomrule
 \end{tabular}
 
@@ -106,7 +107,7 @@ The MVP accepts synthetic hourly visitors, employee availability, and fixed hour
 \end{itemize}
 
 \subsection{Out of scope at this commit}
-Breaks, skills, absences, payroll integration, persistence, UI, deployment, and configurable shift rules are \planned. The local API is implemented; it is not a deployed service. Explicit peak coverage, overtime economics, and configurable objective weights are implemented.
+Breaks, skills, absences, payroll integration, persistence, authentication, deployment, production hardening, asynchronous job storage, and configurable shift rules are \planned. The local API and dashboard are implemented; they are not a deployed service. Explicit peak coverage, overtime economics, and configurable objective weights are implemented.
 
 \section{Architecture and module responsibilities}
 The engine is a functional pipeline:
@@ -133,7 +134,8 @@ Module & Responsibility\\
 \texttt{economics.py} & Compares schedule-derived costs and operational metrics.\\
 \texttt{explain.py} & Lightweight constraint status suitable for the CLI output.\\
 \texttt{cli.py} & Composes the vertical slice, preserves the no-argument demo, and runs validated JSON/CSV file workflows with deterministic outputs.\\
-\texttt{api.py} & Exposes typed FastAPI health, demo, and validated new-store boundaries by calling shared application composition.\\
+\texttt{api.py} & Exposes typed FastAPI health, demo, and validated new-store boundaries by calling shared application composition; serves the dashboard root and static assets.\\
+\texttt{web/*} & Presents API results, metrics, explanations, and local actions without duplicating domain or solver logic.\\
 \bottomrule
 \end{longtable}
 
@@ -222,6 +224,7 @@ The first HTTP surface is implemented as a thin boundary over the verified core.
   \item \texttt{GET /v1/demo} runs the default seed-40 demo and returns the same shape as the CLI.
   \item \texttt{POST /v1/optimize/demo} accepts an optional JSON \texttt{seed} (non-negative integer, default 40) and returns the same result shape.
   \item \texttt{POST /v1/optimize} accepts a typed store scenario and returns the same result shape plus a stable \texttt{scenario} metadata block.
+  \item \texttt{GET /} serves the dependency-light dashboard; \texttt{/static/styles.css} and \texttt{/static/app.js} provide its local assets. The UI runs the demo, accepts one JSON scenario upload, presents current-versus-optimized metrics and constraint explanations, and downloads the demo schedule. CSV upload and uploaded-scenario schedule download are not exposed by the UI.
 \end{itemize}
 The new-store request contains non-empty \texttt{employees} and \texttt{demand}, a bounded \texttt{horizon}, unique employee IDs, unique demand \texttt{(day,hour)} slots, integer MXN rates, per-day \texttt{[start,end)} availability, visitor counts, and explicit \texttt{required\_staff}. Objective weights, overtime configuration, and baseline policy are optional. Duplicate or out-of-range input produces normal FastAPI 422 responses. The route translates the request into immutable domain objects and calls \texttt{cli.run\_scenario(scenario)}; solver, verification, and economics logic is not duplicated. A minimal reproducible request is:
 
@@ -233,7 +236,7 @@ The new-store request contains non-empty \texttt{employees} and \texttt{demand},
  "baseline_policy":{"staffing_floor":1,"shift_start":8,"shift_end":10}}
 \end{verbatim}
 
-The complete JSON request or exact-schema CSV bundle is the reproducibility input. Repeating either with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON and schedule CSV. The \texttt{almond-api} console script starts Uvicorn on the local development address. Persistence, authentication, UI, deployment, and asynchronous job storage remain planned.
+The complete JSON request or exact-schema CSV bundle is the reproducibility input. Repeating either with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON and schedule CSV. The \texttt{almond-api} console script starts Uvicorn on the local development address, and \texttt{GET /} serves the local dashboard. The UI calls \texttt{GET /v1/demo}, \texttt{POST /v1/optimize/json-file}, and \texttt{GET /v1/demo/schedule.csv}; it does not expose CSV upload or retain uploaded scenarios. Persistence, authentication, deployment, asynchronous job storage, and production hardening remain planned.
 
 \section{Operational command-line file workflow}
 The local CLI provides a synchronous batch boundary that does not make API calls. The no-argument command remains the compatibility path:
@@ -317,7 +320,7 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains twenty-nine tests, and the observed result for this work unit is:
+The repository test suite contains the engine, API, CLI, and dashboard regression tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
 .............................                                            [100%]
@@ -351,12 +354,13 @@ Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Deri
 Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Derived, not solver-hard & Schedules above the regular threshold could be underpriced.\\
 Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
 API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health, demo, and validated store-input surface.\\
+Dashboard contract & \texttt{api.py}; \texttt{web/*}; \texttt{tests/test\_api.py} & Product boundary & Implemented & Operators would need raw API or CLI output to inspect business impact and validation status.\\
 Operational CLI contract & \texttt{cli.py}; \texttt{tests/test\_cli.py} & Product boundary & Implemented & File operators would lack a repeatable no-API workflow and stable result artifacts.\\
 \bottomrule
 \end{longtable}
 
 \section{AI-assisted engineering log}
-The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, the validated new-store API, stateless file adapters, and the operational CLI. The current work unit preserves the no-argument command, adds validated JSON/CSV batch execution, and emits deterministic result artifacts without changing the hard 40-hour optimizer cap.
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, the validated new-store API, stateless file adapters, the operational CLI, and this local dashboard. The current work unit preserves the no-argument command, adds a presentation surface over verified API results, and emits no new domain decisions or solver behavior.
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
 
@@ -419,24 +423,24 @@ Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/alm
 Operational CLI workflow & \texttt{README.md}; \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/cli.py}; \texttt{tests/test\_cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{375d930}.\\
+Exact implementation revision & Git commit \texttt{590b1bc}.\\
 \bottomrule
 \end{longtable}
 
 \section{File workflow and schedule export}
 The current work unit adds a stateless file adapter over the validated API. \texttt{POST /v1/optimize/json-file} accepts a UTF-8 \texttt{.json} upload with the documented \texttt{OptimizeRequest} shape. \texttt{POST /v1/optimize/csv} accepts exact headers \texttt{id,hourly\_rate\_mxn}, \texttt{employee\_id,day,start,end}, and \texttt{day,hour,visitors,required\_staff,peak}, plus validated \texttt{days}, \texttt{opening\_hour}, and \texttt{closing\_hour} form fields. Empty files, missing headers, extra columns, duplicates, unknown employees, malformed values, and invalid ranges are rejected before optimization.\par
 
-\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. The local \texttt{almond optimize} command provides the equivalent no-API batch workflow with optional result JSON and schedule CSV paths. Persistence, authentication, UI, deployment, and asynchronous job storage remain \planned. This report documents commit \texttt{375d930}.
+\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. The local \texttt{almond optimize} command provides the equivalent no-API batch workflow with optional result JSON and schedule CSV paths. The dashboard is a local presentation surface; persistence, authentication, deployment, asynchronous job storage, and production hardening remain \planned. This report documents commit \texttt{590b1bc}.
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{375d930}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{375d930}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{375d930}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{375d930}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{375d930}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{590b1bc}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{590b1bc}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{590b1bc}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{590b1bc}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{590b1bc}.
+  \item \texttt{src/almond/}, \texttt{web/}, and \texttt{tests/}, Almond repository, commit \texttt{590b1bc}.
 \end{enumerate}
 
 \revisionhistory
