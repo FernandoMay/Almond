@@ -9,6 +9,10 @@ from .verifier import verify
 
 
 def run_scenario(scenario) -> dict:
+    return run_scenario_with_schedule(scenario)[0]
+
+
+def run_scenario_with_schedule(scenario):
     baseline = build_baseline(scenario)
     result = optimize(scenario)
     current_analysis = analyze_baseline(baseline, scenario)
@@ -54,7 +58,7 @@ def run_scenario(scenario) -> dict:
         "configuration": configuration(scenario),
         "explanations": list(result.explanations),
         "constraints": evaluate_constraints(result.schedule, scenario),
-    }
+    }, result.schedule
 
 
 def run_demo(seed: int = 40) -> dict:

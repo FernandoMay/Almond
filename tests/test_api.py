@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import json
 
 from almond.api import app
 from almond.cli import run_demo
@@ -97,3 +98,62 @@ def test_custom_scenario_returns_verified_deterministic_result():
     assert response.status_code == 200
     assert response.json()["optimized"]["violations"] == []
     assert response.json()["optimized"]["peak_coverage_violations"] == []
+
+
+def test_json_file_success_and_malformed_input():
+    success = client.post("/v1/optimize/json-file", files={"file": ("scenario.json", json.dumps(MINIMAL_PAYLOAD), "application/json")})
+    direct = client.post("/v1/optimize", json=MINIMAL_PAYLOAD)
+    assert success.status_code == 200
+    assert success.json() == direct.json()
+
+    malformed = client.post("/v1/optimize/json-file", files={"file": ("scenario.json", "{bad", "application/json")})
+    wrong_extension = client.post("/v1/optimize/json-file", files={"file": ("scenario.txt", "{}", "text/plain")})
+    assert malformed.status_code == wrong_extension.status_code == 400
+
+
+def _csv_files():
+    return {
+        "employees": ("employees.csv", "id,hourly_rate_mxn\nA1,100\n", "text/csv"),
+        "availability": ("availability.csv", "employee_id,day,start,end\nA1,0,8,10\n", "text/csv"),
+        "demand": ("demand.csv", "day,hour,visitors,required_staff,peak\n0,8,8,1,false\n", "text/csv"),
+    }
+
+
+def test_csv_bundle_success_validation_and_deterministic_output():
+    fields = {"days": "1", "opening_hour": "8", "closing_hour": "10"}
+    first = client.post("/v1/optimize/csv", files=_csv_files(), data=fields)
+    second = client.post("/v1/optimize/csv", files=_csv_files(), data=fields)
+    assert first.status_code == second.status_code == 200
+    assert first.json() == client.post("/v1/optimize", json=MINIMAL_PAYLOAD).json()
+    assert first.content == second.content
+
+    invalid = _csv_files()
+    invalid["availability"] = ("availability.csv", "employee_id,day,start,end\nUNKNOWN,0,8,10\n", "text/csv")
+    assert client.post("/v1/optimize/csv", files=invalid, data=fields).status_code == 400
+
+
+def test_csv_bundle_rejects_extra_row_field_with_client_error():
+    files = _csv_files()
+    files["employees"] = ("employees.csv", "id,hourly_rate_mxn\nA1,100,unexpected\n", "text/csv")
+
+    response = client.post(
+        "/v1/optimize/csv",
+        files=files,
+        data={"days": "1", "opening_hour": "8", "closing_hour": "10"},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "employees.csv contains extra columns; each row must match the exact schema"
+
+
+def test_schedule_exports_have_stable_csv_contract():
+    demo = client.get("/v1/demo/schedule.csv")
+    assert demo.status_code == 200
+    assert demo.headers["content-type"].startswith("text/csv")
+    assert demo.text.splitlines()[0] == "employee_id,day,start,end,hours"
+    assert len(demo.text.splitlines()) > 1
+
+    exported = client.post("/v1/optimize/schedule.csv", json=MINIMAL_PAYLOAD)
+    assert exported.status_code == 200
+    assert exported.headers["content-type"].startswith("text/csv")
+    assert exported.text.splitlines()[0] == "employee_id,day,start,end,hours"

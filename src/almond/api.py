@@ -2,10 +2,12 @@
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field, model_validator
 
-from .cli import run_demo, run_scenario
+from .cli import run_demo, run_scenario, run_scenario_with_schedule
+from .io import InputFileError, parse_csv_bundle, parse_json_bytes, schedule_csv
 from .models import (
     BaselinePolicy,
     DemandPoint,
@@ -222,6 +224,64 @@ def optimize_store(request: OptimizeRequest) -> dict[str, Any]:
     result = run_scenario(scenario)
     result["scenario"] = scenario_metadata(scenario)
     return result
+
+
+def _validated_result(request: OptimizeRequest) -> dict[str, Any]:
+    scenario = build_scenario(request)
+    result = run_scenario(scenario)
+    result["scenario"] = scenario_metadata(scenario)
+    return result
+
+
+@app.post("/v1/optimize/json-file", response_model=OptimizeResponse, summary="Optimize a JSON scenario file")
+async def optimize_json_file(file: UploadFile = File(...)) -> dict[str, Any]:
+    try:
+        payload = parse_json_bytes(file.filename, await file.read())
+        request = OptimizeRequest.model_validate(payload)
+    except InputFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"invalid OptimizeRequest JSON: {exc}") from exc
+    return _validated_result(request)
+
+
+@app.post("/v1/optimize/csv", response_model=OptimizeResponse, summary="Optimize a CSV scenario bundle")
+async def optimize_csv(
+    employees: UploadFile = File(...),
+    availability: UploadFile = File(...),
+    demand: UploadFile = File(...),
+    days: int = Form(...),
+    opening_hour: int = Form(...),
+    closing_hour: int = Form(...),
+) -> dict[str, Any]:
+    try:
+        payload = parse_csv_bundle(
+            await employees.read(), await availability.read(), await demand.read(),
+            days=days, opening_hour=opening_hour, closing_hour=closing_hour,
+        )
+        request = OptimizeRequest.model_validate(payload)
+    except InputFileError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"invalid CSV scenario: {exc}") from exc
+    return _validated_result(request)
+
+
+def _schedule_response(scenario: Scenario) -> PlainTextResponse:
+    _, schedule = run_scenario_with_schedule(scenario)
+    return PlainTextResponse(schedule_csv(schedule), media_type="text/csv")
+
+
+@app.get("/v1/demo/schedule.csv", response_class=PlainTextResponse, summary="Export the optimized demo schedule")
+def export_demo_schedule() -> PlainTextResponse:
+    from .generator import generate_demo
+
+    return _schedule_response(generate_demo())
+
+
+@app.post("/v1/optimize/schedule.csv", response_class=PlainTextResponse, summary="Export an optimized scenario schedule")
+def export_store_schedule(request: OptimizeRequest) -> PlainTextResponse:
+    return _schedule_response(build_scenario(request))
 
 
 def main() -> None:
