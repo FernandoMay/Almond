@@ -39,6 +39,15 @@ constraints:
     source: MVP acceptance criterion
     removal_impact: Removing explainability prevents an operator from auditing why a schedule was produced.
 
+  - id: product.versioned_api_surface
+    kind: product
+    hard: true
+    rule: The local HTTP surface exposes health, deterministic demo, and seed-controlled optimization routes with CLI parity.
+    value: GET /health; GET /v1/demo; POST /v1/optimize/demo
+    source: First Almond product-surface work unit
+    removal_impact: Removing the boundary would leave the verified core without a stable product-facing API contract.
+    status: implemented
+
   - id: implementation.solver
     kind: implementation
     hard: true

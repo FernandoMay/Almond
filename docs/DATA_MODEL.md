@@ -11,3 +11,7 @@
 - `Economics`: baseline/optimized costs, avoided cost, percentage savings, and regular/overtime hours.
 
 Hours are integer buckets. End times are exclusive. Costs are MXN integer amounts.
+
+## API boundaries
+
+The HTTP boundary uses typed Pydantic models for health and demo requests/responses. `DemoRequest.seed` is an optional non-negative integer defaulting to 40. `DemoResponse` preserves the CLI result shape: solver status, current and optimized analyses, economics, configuration, explanations, and constraint evaluations. Invalid request data is rejected with FastAPI's standard 422 response; domain failures are not converted into success responses.

@@ -37,8 +37,9 @@
 \toprule
 Version & Date & Description\\
 \midrule
-0.1.0 & 2026-09-21 & Initial technical report for the previous baseline/economics revision, commit \texttt{95ca2cf}.\\
+0.1.0 & 2026-09-21 & Initial technical report for the previous baseline/economics revision, commit \texttt{bdfe837}.\\
 0.3.0 & 2026-09-22 & Replaced the understaffed comparison with a documented fixed-floor baseline and added a reproducible savings acceptance scenario, commit \texttt{aa457d2}.\\
+0.4.0 & 2026-09-22 & Added the first FastAPI product surface, shared seed-aware CLI composition, API tests, and runtime metadata, commit \texttt{efa0500}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -55,8 +56,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.3.0\\
-As-of revision: & \texttt{aa457d2}\\
+Version: & 0.4.0\\
+As-of revision: & \texttt{efa0500}\\
 Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
@@ -82,7 +83,7 @@ Demand and scheduling & \implemented: integer hourly demand and OR-Tools CP-SAT 
 Hard constraints & \implemented: availability, one contiguous daily interval, and at most 40 weekly hours.\\
 Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, normal coverage, and separate peak-coverage checks.\\
 Economics & \implemented: schedule-derived MXN cost, regular/overtime hours, coverage, peak coverage, understaffing, overstaffing, and delta.\\
-Product surface & \implemented: CLI JSON; API, UI, persistence, and deployment are \planned.\\
+Product surface & \implemented: CLI JSON and versioned local FastAPI routes; UI, persistence, and deployment are \planned.\\
 \bottomrule
 \end{tabular}
 
@@ -102,7 +103,7 @@ The MVP accepts synthetic hourly visitors, employee availability, and fixed hour
 \end{itemize}
 
 \subsection{Out of scope at this commit}
-Breaks, skills, absences, payroll integration, persistence, API, UI, deployment, and configurable shift rules are \planned. Explicit peak coverage, overtime economics, and configurable objective weights are implemented in this work unit.
+Breaks, skills, absences, payroll integration, persistence, UI, deployment, and configurable shift rules are \planned. The local API is implemented; it is not a deployed service. Explicit peak coverage, overtime economics, and configurable objective weights are implemented.
 
 \section{Architecture and module responsibilities}
 The engine is a functional pipeline:
@@ -129,6 +130,7 @@ Module & Responsibility\\
 \texttt{economics.py} & Compares schedule-derived costs and operational metrics.\\
 \texttt{explain.py} & Lightweight constraint status suitable for the CLI output.\\
 \texttt{cli.py} & Composes the vertical slice and prints sorted, indented JSON.\\
+\texttt{api.py} & Exposes typed FastAPI health and versioned demo boundaries by calling the CLI composition.\\
 \bottomrule
 \end{longtable}
 
@@ -210,6 +212,15 @@ Configurable objective weights & \implemented for labor, normal shortage, and pe
 
 The optimizer proposes; the verifier decides whether the returned schedule is valid; economics measures the resulting financial and coverage tradeoff. No UI should infer validity or savings independently.
 
+\section{FastAPI product surface}
+The first HTTP surface is implemented as a thin boundary over the verified core. It exposes the following exact routes:
+\begin{itemize}
+  \item \texttt{GET /health} returns the stable JSON object \texttt{"status":"ok","api\_version":"v1"}.
+  \item \texttt{GET /v1/demo} runs the default seed-40 demo and returns the same shape as the CLI.
+  \item \texttt{POST /v1/optimize/demo} accepts an optional JSON \texttt{seed} (non-negative integer, default 40) and returns the same result shape.
+\end{itemize}
+The API calls \texttt{cli.run\_demo(seed)} for both demo routes; solver, verification, and economics logic is not duplicated. Pydantic request and response models define the boundary, and invalid request values produce normal FastAPI 422 responses. The \texttt{almond-api} console script starts Uvicorn on the local development address. No UI, persistence, authentication, or deployment has been implemented or fabricated.
+
 \section{Baseline, current schedule, and economics}
 \subsection{Formulas}
 For an assignment $a$, hours are $a.end-a.start$. Schedule cost is
@@ -271,10 +282,10 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains eighteen tests, and the observed result for this work unit is:
+The repository test suite contains twenty-four tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
-................                                                         [100%]
+........................                                                 [100%]
 \end{verbatim}
 The executable demo was also run as:
 \begin{verbatim}
@@ -304,6 +315,7 @@ Known employee & \texttt{verifier.py}; \texttt{baseline.py} & Referential validi
 Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Derived, not solver-hard & Economics could be disconnected from actual assignments.\\
 Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Derived, not solver-hard & Schedules above the regular threshold could be underpriced.\\
 Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
+API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health and demo surface.\\
 \bottomrule
 \end{longtable}
 
@@ -351,7 +363,7 @@ pdflatex -interaction=nonstopmode -halt-on-error \
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{aa457d2}; later code changes require re-running both the demo and the report's metric claims.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{efa0500}; later code changes require re-running both the demo and the report's metric claims.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -367,19 +379,19 @@ Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{aa457d2}.\\
+Exact implementation revision & Git commit \texttt{efa0500}.\\
 \bottomrule
 \end{longtable}
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{aa457d2}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{aa457d2}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{aa457d2}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{aa457d2}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{aa457d2}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{efa0500}.
 \end{enumerate}
 
 \revisionhistory
