@@ -8,8 +8,7 @@ from .optimizer import optimize
 from .verifier import verify
 
 
-def run_demo(seed: int = 40) -> dict:
-    scenario = generate_demo(seed)
+def run_scenario(scenario) -> dict:
     baseline = build_baseline(scenario)
     result = optimize(scenario)
     current_analysis = analyze_baseline(baseline, scenario)
@@ -56,6 +55,10 @@ def run_demo(seed: int = 40) -> dict:
         "explanations": list(result.explanations),
         "constraints": evaluate_constraints(result.schedule, scenario),
     }
+
+
+def run_demo(seed: int = 40) -> dict:
+    return run_scenario(generate_demo(seed))
 
 
 def main() -> None:
