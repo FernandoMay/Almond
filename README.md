@@ -16,6 +16,21 @@ The demo is generated from seed `40`; peak buckets are the explicit midday windo
 
 For seed `40`, the current policy costs 26,950 MXN, covers 100% overall and at peak, records 109 overstaffed person-hours and 70 overtime hours, and exposes seven weekly-hour policy violations. The optimized schedule costs 16,402 MXN, also covers 100% overall and at peak, and has no verifier violations. The schedule-derived savings are 10,548 MXN or 39.14%. The 8% figure is the challenge acceptance target; it is not an optimizer input or a hardcoded output.
 
+## Operational CLI file workflow
+
+The no-argument command remains the deterministic seed-40 demo JSON. Use `optimize` for local file workflows; it never makes API calls and reuses the validated request, scenario translation, optimization, verification, economics, and schedule export path:
+
+```bash
+almond optimize --json-file scenario.json \
+  --result-json result.json --schedule-csv optimized.csv
+
+almond optimize --employees employees.csv --availability availability.csv \
+  --demand demand.csv --days 1 --opening-hour 8 --closing-hour 10 \
+  --result-json result.json --schedule-csv optimized.csv
+```
+
+The JSON form accepts the same object as `POST /v1/optimize/json-file`. The CSV form requires exact UTF-8 headers `id,hourly_rate_mxn`, `employee_id,day,start,end`, and `day,hour,visitors,required_staff,peak`; horizon flags are required. `--result-json` writes the complete deterministic result object described above. `--schedule-csv` writes only optimized assignments with header `employee_id,day,start,end,hours`, sorted by day, start, end, and employee ID. If `--result-json` is omitted, result JSON is printed to stdout; if `--schedule-csv` is omitted, no schedule file is created. Parent directories are created only for requested output paths. Malformed files and incomplete input combinations exit non-zero with an actionable error and no traceback.
+
 ## API
 
 The first FastAPI product surface is implemented and reuses the CLI composition path. Run `.venv/bin/almond-api` (or `uvicorn almond.api:app`) for local development. It exposes:
@@ -45,11 +60,11 @@ Uploaded files are statelessly parsed; duplicate IDs/slots, unknown employees, m
 
 ## Architecture
 
-`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `io.py` parses uploads and serializes schedule CSV; `cli.py` composes the vertical slice; `api.py` exposes the versioned HTTP boundary by calling that same composition.
+`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `io.py` parses JSON/CSV inputs and serializes schedule CSV; `cli.py` composes both the no-argument demo and operational file workflow; `api.py` exposes the versioned HTTP boundary by calling that same composition.
 
 ## Limitations
 
-This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, authentication, UI, deployment, and asynchronous job storage remain planned. Uncovered demand is reported rather than silently accepted.
+This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, authentication, UI, deployment, and asynchronous job storage remain planned. The operational CLI is a local batch boundary, not an authorization or job-storage service. Uncovered demand is reported rather than silently accepted.
 
 ## AI-first engineering notes
 

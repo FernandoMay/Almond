@@ -20,6 +20,10 @@ Hours are integer buckets. End times are exclusive. Costs are MXN integer amount
 
 Schedule exports use the stable header `employee_id,day,start,end,hours`, sorted by day, start, end, and employee ID. They contain only optimized assignments; solver state and secrets are never serialized.
 
+## Operational CLI contract
+
+The no-argument `almond` command prints the deterministic seed-40 result JSON. `almond optimize --json-file scenario.json` accepts the same object as the JSON HTTP route. Alternatively, `--employees`, `--availability`, `--demand`, `--days`, `--opening-hour`, and `--closing-hour` must all be supplied for the CSV bundle. The command reuses parsing, `OptimizeRequest` validation, immutable scenario translation, `run_scenario_with_schedule`, and `schedule_csv`; it does not call the API. `--result-json` and `--schedule-csv` are independent optional outputs. Missing result output goes to stdout, while a missing schedule output creates no schedule file. Requested parent directories are created as needed.
+
 ## API boundaries
 
 The HTTP boundary uses typed Pydantic models for health, demo, and new-store requests/responses. `OptimizeRequest` requires non-empty employees, non-empty demand, and a bounded horizon. Employees contain unique IDs, integer MXN rates, and day-keyed availability windows. Demand contains unique `(day, hour)` slots, visitors, explicit required staff, and an optional peak marker. Objective weights, overtime configuration, and baseline policy are optional. Duplicate IDs/slots, empty collections, invalid windows, and out-of-horizon values are rejected with FastAPI's standard 422 response. `DemoResponse` preserves the CLI result shape; `OptimizeResponse` adds `scenario` metadata without changing existing demo routes.

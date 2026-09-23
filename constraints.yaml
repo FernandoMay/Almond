@@ -57,6 +57,15 @@ constraints:
     removal_impact: File consumers could receive ambiguous scenarios or non-reproducible schedule artifacts.
     status: implemented
 
+  - id: product.operational_cli
+    kind: product
+    hard: true
+    rule: The local optimize CLI accepts either one validated JSON scenario or a complete exact-schema CSV bundle and emits deterministic result JSON and optimized schedule CSV without API calls.
+    value: almond optimize; optional --result-json and --schedule-csv; stdout fallback for result JSON
+    source: Operational CLI work unit
+    removal_impact: Operators would need an HTTP runtime for repeatable file-based optimization and could lose deterministic artifact contracts.
+    status: implemented
+
   - id: product.validated_store_input
     kind: product
     hard: true

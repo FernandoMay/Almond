@@ -42,6 +42,7 @@ Version & Date & Description\\
 0.4.0 & 2026-09-22 & Added the first FastAPI product surface, shared seed-aware CLI composition, API tests, and runtime metadata, commit \texttt{efa0500}.\\
 0.5.0 & 2026-09-22 & Added validated new-store input at \texttt{POST /v1/optimize}, shared scenario composition, API tests, and reproducibility evidence, commit \texttt{bf18756}.\\
 0.6.0 & 2026-09-23 & Added stateless JSON/CSV ingestion and deterministic optimized schedule CSV export, commit \texttt{406b004}.\\
+0.7.0 & 2026-09-23 & Added the operational file CLI, tests, and documentation, commit \texttt{375d930}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -58,8 +59,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.6.0\\
-As-of revision: & \texttt{406b004}\\
+Version: & 0.7.0\\
+As-of revision: & \texttt{375d930}\\
 Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
@@ -131,7 +132,7 @@ Module & Responsibility\\
 \texttt{verifier.py} & Independent post-solve checks; it does not call the optimizer.\\
 \texttt{economics.py} & Compares schedule-derived costs and operational metrics.\\
 \texttt{explain.py} & Lightweight constraint status suitable for the CLI output.\\
-\texttt{cli.py} & Composes the vertical slice and prints sorted, indented JSON.\\
+\texttt{cli.py} & Composes the vertical slice, preserves the no-argument demo, and runs validated JSON/CSV file workflows with deterministic outputs.\\
 \texttt{api.py} & Exposes typed FastAPI health, demo, and validated new-store boundaries by calling shared application composition.\\
 \bottomrule
 \end{longtable}
@@ -234,6 +235,27 @@ The new-store request contains non-empty \texttt{employees} and \texttt{demand},
 
 The complete JSON request or exact-schema CSV bundle is the reproducibility input. Repeating either with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON and schedule CSV. The \texttt{almond-api} console script starts Uvicorn on the local development address. Persistence, authentication, UI, deployment, and asynchronous job storage remain planned.
 
+\section{Operational command-line file workflow}
+The local CLI provides a synchronous batch boundary that does not make API calls. The no-argument command remains the compatibility path:
+\begin{verbatim}
+.venv/bin/almond
+\end{verbatim}
+It prints the seed-40 demo result JSON. The explicit optimization command accepts either the validated JSON scenario form:
+\begin{verbatim}
+.venv/bin/almond optimize --json-file scenario.json \\
+  --result-json result.json --schedule-csv optimized.csv
+\end{verbatim}
+or the complete CSV bundle form:
+\begin{verbatim}
+.venv/bin/almond optimize --employees employees.csv \\
+  --availability availability.csv --demand demand.csv \\
+  --days 1 --opening-hour 8 --closing-hour 10 \\
+  --result-json result.json --schedule-csv optimized.csv
+\end{verbatim}
+The JSON input is the same object accepted by \texttt{POST /v1/optimize/json-file}. The CSV files use exact headers \texttt{id,hourly\_rate\_mxn}, \texttt{employee\_id,day,start,end}, and \texttt{day,hour,visitors,required\_staff,peak}; horizon flags define the modeled interval. The command reuses \texttt{parse\_json\_bytes}, \texttt{parse\_csv\_bundle}, \texttt{OptimizeRequest}, \texttt{build\_scenario}, \texttt{run\_scenario\_with\_schedule}, and \texttt{schedule\_csv}; it does not duplicate solver or economics logic.
+
+Both output paths are optional. \texttt{--result-json} writes the complete existing result object with sorted keys, two-space indentation, and a final newline. If it is omitted, that JSON is printed to stdout. \texttt{--schedule-csv} writes only optimized assignments with the stable header \texttt{employee\_id,day,start,end,hours}, sorted by day, start, end, and employee ID. If it is omitted, no schedule file is created. Requested parent directories are created only when needed. Invalid combinations and malformed input exit with code 2 and a concise actionable error without a traceback. The boundary is local and synchronous; authorization, persistence, deployment, and asynchronous job storage remain planned.
+
 \section{Baseline, current schedule, and economics}
 \subsection{Formulas}
 For an assignment $a$, hours are $a.end-a.start$. Schedule cost is
@@ -329,11 +351,12 @@ Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Deri
 Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Derived, not solver-hard & Schedules above the regular threshold could be underpriced.\\
 Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
 API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health, demo, and validated store-input surface.\\
+Operational CLI contract & \texttt{cli.py}; \texttt{tests/test\_cli.py} & Product boundary & Implemented & File operators would lack a repeatable no-API workflow and stable result artifacts.\\
 \bottomrule
 \end{longtable}
 
 \section{AI-assisted engineering log}
-The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, and the validated new-store API. The latest unit adds typed request validation, immutable scenario translation, shared application composition, and deterministic custom-scenario evidence without changing the hard 40-hour optimizer cap.
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, the validated new-store API, stateless file adapters, and the operational CLI. The current work unit preserves the no-argument command, adds validated JSON/CSV batch execution, and emits deterministic result artifacts without changing the hard 40-hour optimizer cap.
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
 
@@ -357,6 +380,7 @@ Given hourly demand and employee availability, choose binary hourly assignments 
   \item Keep peak coverage explicit and separately auditable from normal coverage.
   \item Store objective weights in scenario configuration rather than embedding an 8\% savings target.
   \item Validate new-store input at the API boundary, then reuse the exact verified application path used by the CLI and demo API.
+  \item Keep the operational CLI file boundary explicit: one JSON scenario or a complete CSV bundle, optional deterministic outputs, and no API dependency.
 \end{itemize}
 
 \subsection{Limitations and risks}
@@ -371,13 +395,14 @@ From the repository root, install the package and run the following:
 \begin{verbatim}
 .venv/bin/pip install -e ".[test]"
 .venv/bin/pytest -q
+.venv/bin/almond --help
 .venv/bin/almond
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{bf18756}. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The parent must replace the current-work-unit revision placeholder after committing. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -391,26 +416,27 @@ Data model and interval semantics & \texttt{docs/DATA\_MODEL.md}; \texttt{src/al
 Demand generation & \texttt{src/almond/generator.py}; \texttt{src/almond/demand.py}\\
 Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.md}; \texttt{src/almond/optimizer.py}\\
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
+Operational CLI workflow & \texttt{README.md}; \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/cli.py}; \texttt{tests/test\_cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{406b004}.\\
+Exact implementation revision & Git commit \texttt{375d930}.\\
 \bottomrule
 \end{longtable}
 
 \section{File workflow and schedule export}
 The current work unit adds a stateless file adapter over the validated API. \texttt{POST /v1/optimize/json-file} accepts a UTF-8 \texttt{.json} upload with the documented \texttt{OptimizeRequest} shape. \texttt{POST /v1/optimize/csv} accepts exact headers \texttt{id,hourly\_rate\_mxn}, \texttt{employee\_id,day,start,end}, and \texttt{day,hour,visitors,required\_staff,peak}, plus validated \texttt{days}, \texttt{opening\_hour}, and \texttt{closing\_hour} form fields. Empty files, missing headers, extra columns, duplicates, unknown employees, malformed values, and invalid ranges are rejected before optimization.\par
 
-\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. Persistence, authentication, UI, deployment, and asynchronous job storage remain \planned. This report documents commit \texttt{406b004}.
+\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. The local \texttt{almond optimize} command provides the equivalent no-API batch workflow with optional result JSON and schedule CSV paths. Persistence, authentication, UI, deployment, and asynchronous job storage remain \planned. This report documents commit \texttt{375d930}.
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{406b004}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{406b004}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{406b004}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{406b004}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{406b004}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{375d930}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{375d930}.
 \end{enumerate}
 
 \revisionhistory
