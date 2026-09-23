@@ -1,9 +1,11 @@
 """HTTP product surface for deterministic Almond optimization."""
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, model_validator
 
 from .cli import run_demo, run_scenario, run_scenario_with_schedule
@@ -188,6 +190,15 @@ app = FastAPI(
     version=API_VERSION,
     description="Versioned access to Almond's deterministic workforce optimization demo.",
 )
+
+WEB_ROOT = Path(__file__).resolve().parents[2] / "web"
+app.mount("/static", StaticFiles(directory=WEB_ROOT), name="static")
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    """Serve the dependency-light local operations dashboard."""
+    return FileResponse(WEB_ROOT / "index.html")
 
 
 @app.get("/health", response_model=HealthResponse, summary="Check API health")

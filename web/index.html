@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Almond workforce optimization operations dashboard">
+    <title>Almond Operations Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script type="module" src="/static/app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">A</div>
+      <div>
+        <p class="eyebrow">Jornada40 operations</p>
+        <h1>Almond optimization desk</h1>
+      </div>
+      <span id="api-status" class="status-pill" data-state="idle">Ready</span>
+    </header>
+
+    <main class="shell">
+      <section class="hero" aria-labelledby="hero-title">
+        <div>
+          <p class="eyebrow">Decision support for store staffing</p>
+          <h2 id="hero-title">See the cost of today’s coverage, then validate a better schedule.</h2>
+          <p class="hero-copy">Run Almond’s verified optimizer to compare the current operating policy with a constraint-checked schedule. Results are deterministic and expressed in MXN.</p>
+        </div>
+        <div class="hero-actions" aria-label="Optimization actions">
+          <button id="run-demo" class="button button-primary" type="button">Run demo</button>
+          <label class="button button-secondary file-button" for="scenario-file">Upload JSON scenario</label>
+          <input id="scenario-file" type="file" accept=".json,application/json" hidden>
+        </div>
+      </section>
+
+      <div id="feedback" class="feedback" role="status" aria-live="polite">Run the demo or upload a validated JSON scenario to begin.</div>
+
+      <section id="results" class="results" aria-labelledby="results-title" hidden>
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Verified result</p>
+            <h2 id="results-title">Operational impact</h2>
+          </div>
+          <span id="solver-status" class="status-pill">Awaiting result</span>
+        </div>
+
+        <div class="metric-grid">
+          <article class="metric-card metric-card-featured">
+            <p class="metric-label">Avoided cost</p>
+            <p id="avoided-cost" class="metric-value">—</p>
+            <p id="savings" class="metric-note">— savings</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Current cost</p>
+            <p id="current-cost" class="metric-value">—</p>
+            <p class="metric-note">Current policy</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Optimized cost</p>
+            <p id="optimized-cost" class="metric-value">—</p>
+            <p class="metric-note">Verified schedule</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Overall coverage</p>
+            <p id="coverage" class="metric-value">—</p>
+            <p class="metric-note">Current → optimized</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Peak coverage</p>
+            <p id="peak-coverage" class="metric-value">—</p>
+            <p class="metric-note">Current → optimized</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Overstaffing</p>
+            <p id="overstaffing" class="metric-value">—</p>
+            <p class="metric-note">Current person-hours</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Overtime</p>
+            <p id="overtime" class="metric-value">—</p>
+            <p class="metric-note">Current → optimized hours</p>
+          </article>
+          <article class="metric-card">
+            <p class="metric-label">Validation</p>
+            <p id="validation" class="metric-value">—</p>
+            <p class="metric-note">Independent verifier</p>
+          </article>
+        </div>
+
+        <div class="detail-grid">
+          <article class="panel">
+            <div class="panel-heading">
+              <h3>Constraint explanations</h3>
+              <p>Every result keeps the operating rules visible.</p>
+            </div>
+            <ul id="constraints" class="constraint-list"></ul>
+            <div id="explanations" class="explanation-list"></div>
+          </article>
+          <article class="panel">
+            <div class="panel-heading">
+              <h3>Next action</h3>
+              <p>Take the verified demo schedule into your local workflow.</p>
+            </div>
+            <button id="download-schedule" class="button button-primary" type="button">Download optimized schedule CSV</button>
+            <p id="download-note" class="helper">Available for deterministic demo results. Uploaded scenarios can be exported through the API or CLI.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer shell">
+      <span>Almond local operations surface</span>
+      <span>Persistence, authentication, deployment, and production hardening remain planned.</span>
+    </footer>
+  </body>
+</html>

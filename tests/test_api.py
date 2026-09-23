@@ -22,6 +22,19 @@ def test_health_returns_stable_status_and_api_version():
     assert client.get("/health").json() == {"status": "ok", "api_version": "v1"}
 
 
+def test_dashboard_and_static_assets_are_served_without_changing_api_routes():
+    page = client.get("/")
+    assert page.status_code == 200
+    assert "Almond optimization desk" in page.text
+    assert "Run demo" in page.text
+    assert "Upload JSON scenario" in page.text
+    assert "/static/app.js" in page.text
+    assert client.get("/static/styles.css").status_code == 200
+    assert client.get("/static/app.js").status_code == 200
+    assert client.get("/health").json() == {"status": "ok", "api_version": "v1"}
+    assert client.get("/v1/demo").status_code == 200
+
+
 def test_get_demo_returns_default_deterministic_result():
     first = client.get("/v1/demo")
     second = client.get("/v1/demo")
