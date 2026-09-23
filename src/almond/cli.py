@@ -23,6 +23,33 @@ def run_scenario_with_schedule(scenario):
     optimized_analysis = analyze_baseline(result.schedule, scenario)
     verification = verify(result.schedule, scenario)
     economics = compare(baseline, result.schedule, scenario)
+    optimized_schedule = [
+        {
+            "employee_id": assignment.employee_id,
+            "day": assignment.day,
+            "start": assignment.start,
+            "end": assignment.end,
+            "hours": assignment.hours,
+        }
+        for assignment in sorted(
+            result.schedule.assignments,
+            key=lambda item: (item.day, item.employee_id, item.start, item.end),
+        )
+    ]
+    hourly_coverage = [
+        {
+            "day": point.day,
+            "hour": point.hour,
+            "required": point.demand,
+            "scheduled": optimized_analysis.coverage[point.day, point.hour],
+            "gap": optimized_analysis.coverage[point.day, point.hour] - point.demand,
+            "coverage_percentage": round(
+                optimized_analysis.coverage[point.day, point.hour] / point.demand * 100, 2
+            ) if point.demand else 100.0,
+            "peak": point.peak,
+        }
+        for point in sorted(scenario.demand, key=lambda item: (item.day, item.hour))
+    ]
     return {
         "solver_status": result.solver_status,
         "current": {
@@ -62,6 +89,8 @@ def run_scenario_with_schedule(scenario):
         "configuration": configuration(scenario),
         "explanations": list(result.explanations),
         "constraints": evaluate_constraints(result.schedule, scenario),
+        "optimized_schedule": optimized_schedule,
+        "hourly_coverage": hourly_coverage,
     }, result.schedule
 
 

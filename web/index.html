@@ -104,6 +104,45 @@
             <p id="download-note" class="helper">Available for deterministic demo results. Uploaded scenarios can be exported through the API or CLI.</p>
           </article>
         </div>
+
+        <div class="visualization-grid">
+          <article class="panel" aria-labelledby="schedule-title">
+            <div class="panel-heading">
+              <h3 id="schedule-title">Optimized weekly schedule</h3>
+              <p>Verified shifts grouped by operating day and employee.</p>
+            </div>
+            <div class="table-scroll">
+              <table id="schedule-table">
+                <caption class="sr-only">Optimized schedule by day and employee</caption>
+                <thead><tr><th scope="col">Day</th><th scope="col">Employee</th><th scope="col">Start</th><th scope="col">End</th><th scope="col">Hours</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p id="schedule-empty" class="helper" hidden>No optimized shifts were returned for this scenario.</p>
+          </article>
+
+          <article class="panel coverage-panel" aria-labelledby="coverage-title">
+            <div class="panel-heading">
+              <h3 id="coverage-title">Hourly coverage heatmap</h3>
+              <p>Scheduled staff compared with required staff for each demand bucket.</p>
+            </div>
+            <div class="legend" aria-label="Coverage legend">
+              <span><i class="swatch swatch-peak"></i>Peak</span>
+              <span><i class="swatch swatch-under"></i>Undercoverage</span>
+              <span><i class="swatch swatch-exact"></i>Exact</span>
+              <span><i class="swatch swatch-over"></i>Overcoverage</span>
+            </div>
+            <div id="coverage-heatmap" class="heatmap" role="grid" aria-label="Hourly coverage heatmap"></div>
+            <div class="table-scroll coverage-fallback">
+              <table id="coverage-table">
+                <caption class="sr-only">Accessible hourly coverage data</caption>
+                <thead><tr><th scope="col">Day</th><th scope="col">Hour</th><th scope="col">Required</th><th scope="col">Scheduled</th><th scope="col">Gap</th><th scope="col">Coverage</th><th scope="col">Peak</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p id="coverage-empty" class="helper" hidden>No hourly coverage data was returned for this scenario.</p>
+          </article>
+        </div>
       </section>
     </main>
 

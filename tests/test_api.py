@@ -28,6 +28,9 @@ def test_dashboard_and_static_assets_are_served_without_changing_api_routes():
     assert "Almond optimization desk" in page.text
     assert "Run demo" in page.text
     assert "Upload JSON scenario" in page.text
+    assert "Optimized weekly schedule" in page.text
+    assert "Hourly coverage heatmap" in page.text
+    assert "Accessible hourly coverage data" in page.text
     assert "/static/app.js" in page.text
     assert client.get("/static/styles.css").status_code == 200
     assert client.get("/static/app.js").status_code == 200
@@ -76,6 +79,28 @@ def test_optimize_accepts_minimal_feasible_store_and_is_deterministic():
     assert first.json() == second.json()
     assert first.json()["optimized"]["violations"] == []
     assert first.json()["scenario"]["opening_hours"] == {"start": 8, "end": 10}
+
+
+def test_result_exposes_deterministic_schedule_and_hourly_coverage_rows():
+    payload = {
+        "employees": [
+            {"id": "B2", "hourly_rate_mxn": 100, "availability": {"0": {"start": 8, "end": 10}}},
+            {"id": "A1", "hourly_rate_mxn": 100, "availability": {"0": {"start": 8, "end": 10}}},
+        ],
+        "demand": [
+            {"day": 0, "hour": 9, "visitors": 8, "required_staff": 1},
+            {"day": 0, "hour": 8, "visitors": 8, "required_staff": 1, "peak": True},
+        ],
+        "horizon": {"days": 1, "opening_hour": 8, "closing_hour": 10},
+        "baseline_policy": {"staffing_floor": 1, "shift_start": 8, "shift_end": 10},
+    }
+    result = client.post("/v1/optimize", json=payload).json()
+    assert list(result["optimized_schedule"][0]) == ["employee_id", "day", "start", "end", "hours"]
+    assert result["optimized_schedule"] == sorted(
+        result["optimized_schedule"], key=lambda row: (row["day"], row["employee_id"], row["start"], row["end"])
+    )
+    assert [row["hour"] for row in result["hourly_coverage"]] == [8, 9]
+    assert all(set(row) == {"day", "hour", "required", "scheduled", "gap", "coverage_percentage", "peak"} for row in result["hourly_coverage"])
 
 
 def test_optimize_rejects_duplicate_employee_ids():

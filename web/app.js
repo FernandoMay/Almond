@@ -17,6 +17,8 @@ const formatMxn = (value) => `${new Intl.NumberFormat("en-US").format(value)} MX
 const formatPercent = (value) => `${Number(value).toFixed(2)}%`;
 const formatPair = (current, optimized, formatter) => `${formatter(current)} → ${formatter(optimized)}`;
 const totalHours = (hours) => Object.values(hours || {}).reduce((total, value) => total + Number(value), 0);
+const dayName = (day) => ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][day] || `Day ${day}`;
+const hourLabel = (hour) => `${String(hour).padStart(2, "0")}:00`;
 
 function setState(state, message) {
   elements.apiStatus.dataset.state = state;
@@ -60,7 +62,52 @@ function renderResult(result) {
   elements.solverStatus.textContent = result.solver_status;
   elements.solverStatus.dataset.state = valid ? "idle" : "error";
   renderConstraints(result.constraints, result.explanations);
+  renderSchedule(result.optimized_schedule);
+  renderCoverage(result.hourly_coverage);
   elements.results.hidden = false;
+}
+
+function renderSchedule(rows) {
+  const body = $("#schedule-table tbody");
+  body.replaceChildren();
+  const safeRows = Array.isArray(rows) ? rows : [];
+  $("#schedule-empty").hidden = safeRows.length !== 0;
+  safeRows.forEach((row) => {
+    const tr = document.createElement("tr");
+    [dayName(Number(row.day)), row.employee_id, hourLabel(Number(row.start)), hourLabel(Number(row.end)), `${row.hours}h`].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      tr.append(cell);
+    });
+    body.append(tr);
+  });
+}
+
+function renderCoverage(rows) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const grid = $("#coverage-heatmap");
+  const body = $("#coverage-table tbody");
+  grid.replaceChildren();
+  body.replaceChildren();
+  $("#coverage-empty").hidden = safeRows.length !== 0;
+  safeRows.forEach((row) => {
+    const difference = Number(row.gap);
+    const state = difference < 0 ? "under" : difference === 0 ? "exact" : "over";
+    const cell = document.createElement("div");
+    cell.className = `heat-cell heat-${state}${row.peak ? " heat-peak" : ""}`;
+    cell.setAttribute("role", "gridcell");
+    cell.setAttribute("aria-label", `${dayName(row.day)} ${hourLabel(row.hour)}: ${row.scheduled} scheduled, ${row.required} required${row.peak ? ", peak" : ""}`);
+    cell.textContent = `${dayName(row.day).slice(0, 3)} ${hourLabel(row.hour)} ${row.scheduled}/${row.required}`;
+    grid.append(cell);
+
+    const tr = document.createElement("tr");
+    [dayName(Number(row.day)), hourLabel(Number(row.hour)), row.required, row.scheduled, difference > 0 ? `+${difference}` : difference, `${Number(row.coverage_percentage).toFixed(2)}%`, row.peak ? "Yes" : "No"].forEach((value) => {
+      const td = document.createElement("td");
+      td.textContent = value;
+      tr.append(td);
+    });
+    body.append(tr);
+  });
 }
 
 async function runRequest(request, source) {

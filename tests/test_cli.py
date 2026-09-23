@@ -33,6 +33,16 @@ def test_no_argument_mode_preserves_demo_json(capsys):
     assert json.loads(capsys.readouterr().out) == run_demo()
 
 
+def test_demo_result_has_presentation_ready_schedule_and_coverage_rows():
+    result = run_demo()
+    schedule = result["optimized_schedule"]
+    coverage = result["hourly_coverage"]
+    assert all(list(row) == ["employee_id", "day", "start", "end", "hours"] for row in schedule)
+    assert schedule == sorted(schedule, key=lambda row: (row["day"], row["employee_id"], row["start"], row["end"]))
+    assert coverage == sorted(coverage, key=lambda row: (row["day"], row["hour"]))
+    assert all(list(row) == ["day", "hour", "required", "scheduled", "gap", "coverage_percentage", "peak"] for row in coverage)
+
+
 def test_json_file_workflow_writes_result_and_schedule(tmp_path):
     scenario = tmp_path / "scenario.json"
     result = tmp_path / "nested" / "result.json"

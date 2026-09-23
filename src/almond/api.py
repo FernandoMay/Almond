@@ -43,6 +43,8 @@ class DemoResponse(BaseModel):
     configuration: dict[str, Any]
     explanations: list[str]
     constraints: dict[str, Any]
+    optimized_schedule: list[dict[str, Any]]
+    hourly_coverage: list[dict[str, Any]]
 
 
 class AvailabilityWindow(BaseModel):
