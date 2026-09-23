@@ -1,9 +1,13 @@
+import argparse
 import json
+from pathlib import Path
+from typing import Sequence
 
 from .baseline import analyze_baseline, build_baseline
 from .economics import compare
 from .explain import configuration, evaluate_constraints
 from .generator import generate_demo
+from .io import InputFileError, parse_csv_bundle, parse_json_bytes, schedule_csv
 from .optimizer import optimize
 from .verifier import verify
 
@@ -65,8 +69,103 @@ def run_demo(seed: int = 40) -> dict:
     return run_scenario(generate_demo(seed))
 
 
-def main() -> None:
-    print(json.dumps(run_demo(), indent=2, sort_keys=True))
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="almond",
+        description="Run deterministic Almond workforce optimization without API calls.",
+        epilog=(
+            "Examples:\n"
+            "  almond\n"
+            "  almond optimize --json-file scenario.json --result-json result.json --schedule-csv optimized.csv\n"
+            "  almond optimize --employees employees.csv --availability availability.csv "
+            "--demand demand.csv --days 1 --opening-hour 8 --closing-hour 10"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
+    optimize_parser = subparsers.add_parser(
+        "optimize",
+        help="optimize a JSON scenario or an exact-schema CSV bundle",
+        description=(
+            "Use exactly one input form. JSON must contain the documented scenario object. "
+            "The CSV form requires all three files and horizon flags. Outputs are optional: "
+            "without --result-json, result JSON is printed to stdout; --schedule-csv writes "
+            "the optimized schedule with header employee_id,day,start,end,hours."
+        ),
+        epilog=(
+            "JSON example:\n"
+            "  almond optimize --json-file scenario.json --result-json result.json --schedule-csv optimized.csv\n"
+            "CSV example:\n"
+            "  almond optimize --employees employees.csv --availability availability.csv --demand demand.csv "
+            "--days 1 --opening-hour 8 --closing-hour 10"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    input_group = optimize_parser.add_mutually_exclusive_group()
+    input_group.add_argument("--json-file", type=Path, help="UTF-8 JSON scenario file")
+    input_group.add_argument("--employees", type=Path, help="CSV employees file (CSV bundle form)")
+    optimize_parser.add_argument("--availability", type=Path, help="CSV availability file (CSV bundle form)")
+    optimize_parser.add_argument("--demand", type=Path, help="CSV demand file (CSV bundle form)")
+    optimize_parser.add_argument("--days", type=int, help="CSV bundle horizon length")
+    optimize_parser.add_argument("--opening-hour", type=int, help="CSV bundle opening hour")
+    optimize_parser.add_argument("--closing-hour", type=int, help="CSV bundle closing hour")
+    optimize_parser.add_argument("--result-json", type=Path, help="write deterministic result JSON to this path")
+    optimize_parser.add_argument("--schedule-csv", type=Path, help="write deterministic optimized schedule CSV to this path")
+    return parser
+
+
+def _read_scenario(args: argparse.Namespace):
+    csv_options = (args.employees, args.availability, args.demand, args.days, args.opening_hour, args.closing_hour)
+    if args.json_file is not None:
+        if any(value is not None for value in csv_options):
+            raise InputFileError("JSON input cannot be combined with CSV files or horizon flags")
+        payload = parse_json_bytes(args.json_file.name, args.json_file.read_bytes())
+    elif any(value is not None for value in csv_options):
+        if not all(value is not None for value in csv_options):
+            raise InputFileError("CSV input requires employees, availability, demand, days, opening-hour, and closing-hour")
+        payload = parse_csv_bundle(
+            args.employees.read_bytes(), args.availability.read_bytes(), args.demand.read_bytes(),
+            days=args.days, opening_hour=args.opening_hour, closing_hour=args.closing_hour,
+        )
+    else:
+        raise InputFileError("provide --json-file or the complete CSV bundle and horizon flags")
+
+    # Import lazily: api.py reuses this module for the shared application path.
+    from .api import OptimizeRequest, build_scenario
+
+    return build_scenario(OptimizeRequest.model_validate(payload))
+
+
+def _write_deterministic(path: Path, content: str) -> None:
+    if path.parent != Path("."):
+        path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8", newline="\n")
+
+
+def _run_optimize(args: argparse.Namespace) -> int:
+    scenario = _read_scenario(args)
+    result, schedule = run_scenario_with_schedule(scenario)
+    result_json = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if args.result_json is not None:
+        _write_deterministic(args.result_json, result_json)
+    else:
+        print(result_json, end="")
+    if args.schedule_csv is not None:
+        _write_deterministic(args.schedule_csv, schedule_csv(schedule))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    parser = _build_parser()
+    args = parser.parse_args(argv)
+    if args.command is None:
+        print(json.dumps(run_demo(), indent=2, sort_keys=True))
+        return 0
+    try:
+        return _run_optimize(args)
+    except (InputFileError, OSError, ValueError) as exc:
+        parser.error(str(exc))
+    return 2
 
 
 if __name__ == "__main__":
