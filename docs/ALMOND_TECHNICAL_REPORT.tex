@@ -46,6 +46,7 @@ Version & Date & Description\\
 0.8.0 & 2026-09-23 & Added the FastAPI-served local operations dashboard, route/static tests, and synchronized documentation, commit \texttt{590b1bc}.\\
 0.9.0 & 2026-09-23 & Added deterministic schedule rows, hourly coverage data, a weekly schedule table, and a peak-aware dashboard heatmap, commit \texttt{d46b2f4}.\\
 0.10.0 & 2026-09-23 & Added and executed the Playwright dashboard E2E suite, commit \texttt{06b85e2}.\\
+0.11.0 & 2026-09-23 & Added the stateless Docker local demo contract, Compose lifecycle commands, non-root container, and structural validation; Docker runtime verification pending.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -91,6 +92,7 @@ Verification & \implemented: independent availability, overlap, unknown employee
 Economics & \implemented: schedule-derived MXN cost, regular/overtime hours, coverage, peak coverage, understaffing, overstaffing, and delta.\\
 Product surface & \implemented: CLI JSON, versioned local FastAPI routes, and a static dashboard at \texttt{GET /}; persistence, authentication, deployment, and hardening are \planned.\\
 Browser E2E & \implemented: Playwright checks for accessible dashboard behavior, demo metrics, schedule/heatmap rendering, CSV download, JSON upload, and malformed JSON errors; 4 browser tests pass.\\
+Docker local demo & \implemented: one stateless \texttt{python:3.12-slim} service, non-root execution, port 8000, and \texttt{/health} check; build/runtime verification pending because Docker is unavailable.\\
 \bottomrule
 \end{tabular}
 
@@ -111,6 +113,7 @@ The MVP accepts synthetic hourly visitors, employee availability, and fixed hour
 
 \subsection{Out of scope at this commit}
 Breaks, skills, absences, payroll integration, persistence, authentication, deployment, production hardening, asynchronous job storage, and configurable shift rules are \planned. The local API and dashboard are implemented; they are not a deployed service. Explicit peak coverage, overtime economics, and configurable objective weights are implemented.
+The Docker setup is a local packaging and reproducibility boundary only. \texttt{docker-compose.yml} contains one service, maps \texttt{8000:8000}, uses no database or volume, and does not imply persistence, authentication, cloud deployment, or production readiness.
 
 \section{Architecture and module responsibilities}
 The engine is a functional pipeline:
@@ -139,6 +142,7 @@ Module & Responsibility\\
 \texttt{cli.py} & Composes the vertical slice, preserves the no-argument demo, and runs validated JSON/CSV file workflows with deterministic outputs.\\
 \texttt{api.py} & Exposes typed FastAPI health, demo, and validated new-store boundaries by calling shared application composition; serves the dashboard root and static assets.\\
 \texttt{web/*} & Presents API results, metrics, explanations, and local actions without duplicating domain or solver logic.\\
+\texttt{Dockerfile}; \texttt{docker-compose.yml} & Package the API/dashboard as one non-root local service on port 8000 with a standard-library health probe; no persistence or cloud topology.\\
 \bottomrule
 \end{longtable}
 
@@ -420,6 +424,13 @@ pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
 The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The browser prerequisites are installed and \texttt{npm run test:e2e} passed four tests. This report documents commit \texttt{06b85e2}. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
+The Docker local demo commands are:
+\begin{verbatim}
+docker compose up --build
+docker compose exec -T almond python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"
+docker compose down
+\end{verbatim}
+The Dockerfile and Compose contract were structurally validated in this environment, but Docker was unavailable (`docker: command not found`); therefore image build and runtime health verification are pending. The setup is local-only and makes no database, persistence, authentication, cloud deployment, or production-readiness claim.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -436,7 +447,7 @@ Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/alm
 Operational CLI workflow & \texttt{README.md}; \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/cli.py}; \texttt{tests/test\_cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{06b85e2}.\\
+Exact implementation revision & Git commit \texttt{b7b7417}.\\
 \bottomrule
 \end{longtable}
 

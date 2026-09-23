@@ -102,6 +102,15 @@ constraints:
     removal_impact: Dashboard regressions could pass API tests while breaking the real accessible browser workflow.
     status: test setup implemented; browser verification pending after ENOSPC during Chromium installation
 
+  - id: product.local_docker_demo
+    kind: product
+    hard: true
+    rule: The local FastAPI dashboard/API can be packaged as one stateless non-root container with a stable port and health contract.
+    value: Dockerfile; docker-compose.yml; host port 8000; GET /health; docker compose up --build and docker compose down
+    source: Local Docker demo work unit
+    removal_impact: Local operators would lack a reproducible container boundary for the existing dashboard/API.
+    status: implemented; Docker build and runtime verification pending because docker: command not found
+
   - id: implementation.solver
     kind: implementation
     hard: true

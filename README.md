@@ -60,7 +60,23 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Playwright starts `.venv/bin/uvicorn almond.api:app` on `127.0.0.1:8000` and reuses an already-running server. Browser installation is required; the E2E suite is not considered verified until browser installation and `npm run test:e2e` both complete successfully. The current environment's browser download was blocked by `ENOSPC` (no space left on device), so the setup is runnable but browser verification remains pending. Persistence, authentication, deployment, and production hardening remain planned.
+Playwright starts `.venv/bin/uvicorn almond.api:app` on `127.0.0.1:8000` and reuses an already-running server. Browser installation is required; the E2E suite is not considered verified until browser installation and `npm run test:e2e` both complete successfully. Chromium is installed and the four-test suite passes in the current environment. Persistence, authentication, cloud deployment, and production hardening remain planned.
+
+### Docker local demo
+
+The repository includes a one-service, stateless Docker demo for the FastAPI dashboard/API. It uses `python:3.12-slim`, installs Almond from this repository, runs as the non-root `almond` user, listens on container port `8000`, and checks `GET /health` with Python's standard library. It does not add a database, volume, authentication, cloud deployment, or persistence claim.
+
+From the repository root:
+
+```bash
+docker compose up --build
+# In another terminal:
+docker compose ps
+docker compose exec -T almond python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"
+docker compose down
+```
+
+Equivalent `make docker-up`, `make docker-health`, and `make docker-down` targets are provided. Docker was not available during the current verification (`docker: command not found`), so the Dockerfile and Compose contract were checked structurally; image build and runtime health verification remain pending.
 
 Example request:
 
