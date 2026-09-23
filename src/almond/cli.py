@@ -8,8 +8,8 @@ from .optimizer import optimize
 from .verifier import verify
 
 
-def run_demo() -> dict:
-    scenario = generate_demo()
+def run_demo(seed: int = 40) -> dict:
+    scenario = generate_demo(seed)
     baseline = build_baseline(scenario)
     result = optimize(scenario)
     current_analysis = analyze_baseline(baseline, scenario)
