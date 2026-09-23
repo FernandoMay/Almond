@@ -93,6 +93,15 @@ constraints:
     removal_impact: Operators would need to reconstruct shift and hourly coverage detail from raw assignments and demand data.
     status: implemented
 
+  - id: product.browser_dashboard_e2e
+    kind: product
+    hard: true
+    rule: Browser-level dashboard checks cover accessible loading, deterministic demo results, schedule and heatmap rendering, demo CSV download, valid JSON upload state, and visible malformed JSON errors.
+    value: npm run test:e2e; Chromium installation required
+    source: Browser dashboard E2E work unit
+    removal_impact: Dashboard regressions could pass API tests while breaking the real accessible browser workflow.
+    status: test setup implemented; browser verification pending after ENOSPC during Chromium installation
+
   - id: implementation.solver
     kind: implementation
     hard: true

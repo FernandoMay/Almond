@@ -45,6 +45,7 @@ Version & Date & Description\\
 0.7.0 & 2026-09-23 & Added the operational file CLI, tests, and documentation, commit \texttt{375d930}.\\
 0.8.0 & 2026-09-23 & Added the FastAPI-served local operations dashboard, route/static tests, and synchronized documentation, commit \texttt{590b1bc}.\\
 0.9.0 & 2026-09-23 & Added deterministic schedule rows, hourly coverage data, a weekly schedule table, and a peak-aware dashboard heatmap, commit \texttt{d46b2f4}.\\
+0.10.0 & 2026-09-23 & Added and executed the Playwright dashboard E2E suite, commit \texttt{06b85e2}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -89,6 +90,7 @@ Hard constraints & \implemented: availability, one contiguous daily interval, an
 Verification & \implemented: independent availability, overlap, unknown employee, weekly-hour, normal coverage, and separate peak-coverage checks.\\
 Economics & \implemented: schedule-derived MXN cost, regular/overtime hours, coverage, peak coverage, understaffing, overstaffing, and delta.\\
 Product surface & \implemented: CLI JSON, versioned local FastAPI routes, and a static dashboard at \texttt{GET /}; persistence, authentication, deployment, and hardening are \planned.\\
+Browser E2E & \implemented: Playwright checks for accessible dashboard behavior, demo metrics, schedule/heatmap rendering, CSV download, JSON upload, and malformed JSON errors; 4 browser tests pass.\\
 \bottomrule
 \end{tabular}
 
@@ -321,7 +323,7 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains the engine, API, CLI, and dashboard regression tests, and the observed result for this work unit is:
+The repository test suite contains the engine, API, CLI, and dashboard regression tests, and the observed result for the prior work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
 .............................................                            [100%]
@@ -333,6 +335,8 @@ The executable demo was also run as:
 It returned JSON with \texttt{solver\_status: OPTIMAL}, the metrics in Table 3, empty optimized violations, zero optimized overtime, explicit weights $(1,10000,20000)$, and all four reported constraint evaluations true. PDF verification for this report is specified in Section~\ref{sec:repro}.
 
 The current schedule-visualization work unit adds \texttt{optimized\_schedule} rows containing \texttt{employee\_id}, day, start, end, and hours, sorted by day/employee/interval, and \texttt{hourly\_coverage} rows containing day, hour, required, scheduled, signed gap, coverage percentage, and peak, sorted by day/hour. The dashboard presents these shared result fields without moving optimization or verification logic into the browser.
+
+The browser E2E work unit adds \texttt{package.json}, \texttt{package-lock.json}, \texttt{playwright.config.mjs}, and \texttt{e2e/dashboard.spec.mjs}. The suite uses the local \texttt{.venv/bin/uvicorn almond.api:app} web server with reuse enabled, role/label/text locators, bounded assertions, and no arbitrary sleeps. It covers the accessible shell, seed-40 completion state and 39.14\% savings, validation, schedule rows, heatmap cells, real CSV download header, valid upload state and disabled demo-only download, and malformed JSON error rendering. The exact commands are \texttt{npm install}, \texttt{npx playwright install chromium}, and \texttt{npm run test:e2e}; all four browser tests passed after freeing npm cache space and installing Chromium.
 
 \section{Constraint registry and traceability}
 \begin{longtable}{p{0.19\linewidth}p{0.22\linewidth}p{0.12\linewidth}p{0.13\linewidth}p{0.24\linewidth}}
@@ -358,12 +362,13 @@ Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Der
 Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
 API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health, demo, and validated store-input surface.\\
 Dashboard contract & \texttt{api.py}; \texttt{web/*}; \texttt{tests/test\_api.py} & Product boundary & Implemented & Operators would need raw API or CLI output to inspect business impact and validation status.\\
+Browser dashboard E2E & \texttt{playwright.config.mjs}; \texttt{e2e/dashboard.spec.mjs} & Product boundary & Implemented; 4 browser tests pass & Browser regressions could pass API tests while breaking the real accessible workflow.\\
 Operational CLI contract & \texttt{cli.py}; \texttt{tests/test\_cli.py} & Product boundary & Implemented & File operators would lack a repeatable no-API workflow and stable result artifacts.\\
 \bottomrule
 \end{longtable}
 
 \section{AI-assisted engineering log}
-The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, the validated new-store API, stateless file adapters, the operational CLI, and this local dashboard. The current work unit preserves the no-argument command, adds a presentation surface over verified API results, and emits no new domain decisions or solver behavior.
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, the validated new-store API, stateless file adapters, the operational CLI, and this local dashboard. The current work unit preserves the no-argument command, adds browser-level checks over the presentation surface, and emits no new domain decisions or solver behavior. Four Playwright browser tests passed against the local Uvicorn server.
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
 
@@ -389,6 +394,7 @@ Given hourly demand and employee availability, choose binary hourly assignments 
   \item Validate new-store input at the API boundary, then reuse the exact verified application path used by the CLI and demo API.
   \item Keep the operational CLI file boundary explicit: one JSON scenario or a complete CSV bundle, optional deterministic outputs, and no API dependency.
   \item Derive schedule and hourly coverage visualization rows in the shared application result so every client receives deterministic, presentation-ready data.
+  \item Keep browser E2E checks at the product boundary, using accessible user-facing locators and real download assertions without duplicating domain logic.
 \end{itemize}
 
 \subsection{Limitations and risks}
@@ -405,12 +411,15 @@ From the repository root, install the package and run the following:
 .venv/bin/pytest -q
 .venv/bin/almond --help
 .venv/bin/almond
+npm install
+npx playwright install chromium
+npm run test:e2e
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The parent must replace the current-work-unit revision placeholder \texttt{CURRENT\_WORK\_UNIT\_REVISION} after committing. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The browser prerequisites are installed and \texttt{npm run test:e2e} passed four tests. This report documents commit \texttt{06b85e2}. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -427,7 +436,7 @@ Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/alm
 Operational CLI workflow & \texttt{README.md}; \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/cli.py}; \texttt{tests/test\_cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{d46b2f4}.\\
+Exact implementation revision & Git commit \texttt{06b85e2}.\\
 \bottomrule
 \end{longtable}
 

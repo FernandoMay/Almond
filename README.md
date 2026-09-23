@@ -48,6 +48,20 @@ The first FastAPI product surface is implemented and reuses the CLI composition 
 
 With the API running, open `http://127.0.0.1:8000/`. The dependency-light dashboard runs the deterministic demo through `GET /v1/demo`, uploads one validated `.json` scenario through `POST /v1/optimize/json-file`, and presents current-versus-optimized MXN cost, avoided cost, savings percentage, overall and peak coverage, overstaffing, overtime, constraint explanations, verifier status, an optimized weekly schedule table, and a day-by-hour coverage heatmap with an accessible table fallback. Demo results can download the deterministic schedule from `GET /v1/demo/schedule.csv`. Uploaded scenarios remain stateless in the browser; their schedule download is intentionally unavailable in this UI and remains available through the API or CLI.
 
+### Browser E2E checks
+
+The repository includes a minimal Playwright setup in `e2e/` for the dashboard's accessible shell, deterministic demo metrics and visualizations, demo CSV download, valid JSON upload state, and malformed JSON error state. It uses the existing local FastAPI application and no frontend framework.
+
+From the repository root, with the Python environment and Node.js/npm available:
+
+```bash
+npm install
+npx playwright install chromium
+npm run test:e2e
+```
+
+Playwright starts `.venv/bin/uvicorn almond.api:app` on `127.0.0.1:8000` and reuses an already-running server. Browser installation is required; the E2E suite is not considered verified until browser installation and `npm run test:e2e` both complete successfully. The current environment's browser download was blocked by `ENOSPC` (no space left on device), so the setup is runnable but browser verification remains pending. Persistence, authentication, deployment, and production hardening remain planned.
+
 Example request:
 
 ```json
