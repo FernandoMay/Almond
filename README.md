@@ -1,13 +1,44 @@
 # Almond
 
-Almond is the backend/core-engine MVP for Jornada40: it turns hourly demand into an explainable workforce schedule.
+Almond is the Jornada40 workforce-optimization MVP: it turns hourly demand, availability, and MXN rates into an explainable schedule that is independently verified before its economics are shown.
+
+## Start here
+
+**Problem.** A fixed staffing policy can cover demand while paying for avoidable overstaffing and overtime.
+
+**Solution.** Almond compares that explicit current policy with a CP-SAT schedule over the same deterministic scenario, then reports coverage, violations, cost, and savings from the generated assignments.
+
+**Current modeled result.** Seed `40` produces `26,950 MXN` current cost versus `16,402 MXN` optimized cost: `10,548 MXN` avoided, or **39.14% scenario-specific savings**, with `100.00%` overall and peak coverage in both schedules. This is not a universal savings claim; changing demand, wages, service time, availability, or baseline policy requires recomputation.
+
+**Architecture.** `generator → demand → baseline/CP-SAT → independent verifier → economics/explanations → CLI/API/dashboard`. The API and dashboard are local presentation boundaries; persistence, authentication, cloud deployment, asynchronous job storage, and production hardening remain planned.
+
+### Two-minute quick start
+
+```bash
+.venv/bin/pytest -q
+.venv/bin/almond
+make verify
+```
+
+The last command is the single non-Docker release gate. It runs unit/API tests, browser E2E tests, JavaScript syntax validation, a byte-identical deterministic CLI check, two-pass PDF compilation, and required-artifact checks.
+
+### Exact demo commands
+
+```bash
+.venv/bin/almond
+.venv/bin/almond-api
+# Open http://127.0.0.1:8000/ in another terminal
+make verify
+```
+
+For the presentation narration, metrics, and trust answer, use [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). The full release boundary is [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md).
 
 ## Setup and run
 
 ```bash
-python -m pip install -e "."
-python -m pytest -q
-python -m almond
+.venv/bin/pip install -e ".[test]"
+.venv/bin/pytest -q
+.venv/bin/almond
 # Optional local API and dashboard
 .venv/bin/almond-api
 # or: uvicorn almond.api:app --reload
@@ -62,6 +93,10 @@ npm run test:e2e
 
 Playwright starts `.venv/bin/uvicorn almond.api:app` on `127.0.0.1:8000` and reuses an already-running server. Browser installation is required; the E2E suite is not considered verified until browser installation and `npm run test:e2e` both complete successfully. Chromium is installed and the four-test suite passes in the current environment. Persistence, authentication, cloud deployment, and production hardening remain planned.
 
+### Verification and technical report
+
+`make verify` is the release gate and ends with `ALMOND VERIFY: PASS` only when every stage succeeds. LaTeX output is temporary and must include a non-empty PDF. The technical report is [`docs/ALMOND_TECHNICAL_REPORT.tex`](docs/ALMOND_TECHNICAL_REPORT.tex); the AI engineering record is [`docs/AI_ENGINEERING_LOG.md`](docs/AI_ENGINEERING_LOG.md).
+
 ### Docker local demo
 
 The repository includes a one-service, stateless Docker demo for the FastAPI dashboard/API. It uses `python:3.12-slim`, installs Almond from this repository, runs as the non-root `almond` user, listens on container port `8000`, and checks `GET /health` with Python's standard library. It does not add a database, volume, authentication, cloud deployment, or persistence claim.
@@ -77,6 +112,8 @@ docker compose down
 ```
 
 Equivalent `make docker-up`, `make docker-health`, and `make docker-down` targets are provided. Docker was not available during the current verification (`docker: command not found`), so the Dockerfile and Compose contract were checked structurally; image build and runtime health verification remain pending.
+
+Run the complete Docker boundary separately with `make docker-verify`. It runs Compose config, build, detached start, the documented health probe, and shutdown. A successful `make verify` never implies Docker passed.
 
 Example request:
 

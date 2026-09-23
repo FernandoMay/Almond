@@ -109,7 +109,25 @@ constraints:
     value: Dockerfile; docker-compose.yml; host port 8000; GET /health; docker compose up --build and docker compose down
     source: Local Docker demo work unit
     removal_impact: Local operators would lack a reproducible container boundary for the existing dashboard/API.
-    status: implemented; Docker build and runtime verification pending because docker: command not found
+   status: implemented; Docker build and runtime verification pending because docker: command not found
+
+  - id: product.release_gate
+    kind: product
+    hard: true
+    rule: The non-Docker release gate runs all local test, syntax, deterministic CLI, report, and required-artifact checks and emits one pass marker only after success.
+    value: make verify; ALMOND VERIFY: PASS
+    source: Release hardening work unit
+    removal_impact: Reviewers could miss a failed presentation, reproducibility, report, or required-file contract.
+    status: implemented
+
+  - id: product.docker_release_boundary
+    kind: product
+    hard: true
+    rule: Docker configuration, build, lifecycle, and health verification are a separate gate and never inferred from the local release gate.
+    value: make docker-verify; docker compose config/build/up/health/down
+    source: Release hardening work unit
+    removal_impact: A local test pass could be incorrectly presented as container verification.
+    status: implemented; unavailable here with docker: command not found
 
   - id: implementation.solver
     kind: implementation
