@@ -56,6 +56,22 @@ constraints:
     removal_impact: Removing peak coverage can create misleading savings by reducing staffing during high-demand periods.
     status: implemented
 
+  - id: baseline.fixed_floor_policy
+    kind: operational
+    hard: false
+    rule: The current-policy comparison keeps a configurable five-person floor across the full opening interval and rotates employees deterministically by day.
+    value: staffing floor 5; shift 08:00-18:00; round-robin rotation
+    source: Observed operating-policy assumption for the seed-40 demonstration
+    removal_impact: Removing this assumption changes the current-policy comparison and its measured overstaffing, overtime, and savings; it does not relax optimized-schedule verification.
+
+  - id: baseline.coverage_measurement
+    kind: measurement
+    hard: false
+    rule: Baseline analysis reports overall and peak coverage, under/overstaffing, regular/overtime hours, and all observed violations.
+    value: schedule-derived metrics using scenario demand and overtime configuration
+    source: Workforce comparison auditability requirement
+    removal_impact: Removing these measurements could hide an understaffed or overtime-heavy baseline and disconnect savings from operational evidence.
+
   - id: financial.overtime_economics
     kind: financial
     hard: false
@@ -79,4 +95,4 @@ constraints:
     value: 8%
     source: Challenge acceptance criterion
     removal_impact: Removing this target changes the business acceptance criterion but does not affect schedule feasibility.
-    status: target
+    status: acceptance target; not an implementation assumption or solver objective

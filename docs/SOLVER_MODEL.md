@@ -134,11 +134,14 @@ The following remain planned extensions:
 1. schedule-change penalties;
 2. configurable shift lengths and breaks.
 
-The baseline layer now provides a deterministic current schedule and measures
-its schedule-derived cost, coverage, peak coverage, understaffing, overstaffing,
-availability, and weekly-hour violations. The economics layer compares those
-values with the optimized schedule using the same hourly cost rules and reports
-regular versus overtime hours.
+The baseline layer provides a deterministic current policy: a configurable
+five-person floor on the full 08:00--18:00 opening interval, rotated by day.
+It measures schedule-derived cost, coverage, peak coverage, understaffing,
+overstaffing, availability, and weekly-hour violations. The economics layer
+compares those values with the optimized schedule using the same hourly cost
+rules and reports regular versus overtime hours. The demo's baseline has 350
+hours, 280 regular hours, and 70 overtime hours; the overtime premium is
+included in its 26,950 MXN cost.
 
 These extensions must preserve the hard constraints above.
 

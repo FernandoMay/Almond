@@ -10,7 +10,9 @@ python -m pytest -q
 python -m almond
 ```
 
-The demo is generated from seed `40`; peak buckets are the explicit midday window `[12:00, 16:00)`. All costs are calculated from generated assignments and employee rates. The current comparison is a deterministic rotating 08:00–16:00 schedule from the same employees and availability, not a fully open schedule. The console output is JSON with current-versus-optimized MXN economics, separate peak coverage, violations, objective weights, overtime settings, and constraint evaluations.
+The demo is generated from seed `40`; peak buckets are the explicit midday window `[12:00, 16:00)`. All costs are calculated from generated assignments and employee rates. The current comparison is a configurable deterministic policy: a five-person fixed staffing floor works 08:00–18:00 every day, with round-robin rotation across the same employees and availability. This assumption provides full demand coverage but deliberately measures the overstaffing and overtime of a rigid operating policy. The console output is JSON with current-versus-optimized MXN economics, regular/overtime hours, separate peak coverage, violations, objective weights, overtime settings, and constraint evaluations.
+
+For seed `40`, the current policy costs 26,950 MXN, covers 100% overall and at peak, records 109 overstaffed person-hours and 70 overtime hours, and exposes seven weekly-hour policy violations. The optimized schedule costs 16,402 MXN, also covers 100% overall and at peak, and has no verifier violations. The schedule-derived savings are 10,548 MXN or 39.14%. The 8% figure is the challenge acceptance target; it is not an optimizer input or a hardcoded output.
 
 ## Architecture
 

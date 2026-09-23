@@ -38,7 +38,7 @@
 Version & Date & Description\\
 \midrule
 0.1.0 & 2026-09-21 & Initial technical report for the previous baseline/economics revision, commit \texttt{95ca2cf}.\\
-0.2.0 & 2026-09-21 & Added peak coverage, overtime economics, and objective weights, commit \texttt{4831485}.\\
+0.3.0 & 2026-09-22 & Replaced the understaffed comparison with a documented fixed-floor baseline and added a reproducible savings acceptance scenario, commit \texttt{aa457d2}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -55,8 +55,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.2.0\\
-As-of revision: & \texttt{4831485}\\
+Version: & 0.3.0\\
+As-of revision: & \texttt{aa457d2}\\
 Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
@@ -70,7 +70,7 @@ Repository: & \repo
 \section{Executive summary}
 Almond is the backend and core-engine MVP for Jornada40. It transforms deterministic hourly visitor demand, employee availability, and MXN hourly rates into an explainable schedule. The implementation is a small Python vertical slice: data generation, demand calculation, a CP-SAT optimizer, independent verification, baseline analysis, schedule-derived economics, and a JSON command-line demo.
 
-\callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled and peak coverage with an optimized cost of 16,402 MXN. Its generated current schedule costs 15,680 MXN, covers 74.27\% overall and 98.08\% at peak, so the honest cost delta is \textbf{-722 MXN avoided} or \textbf{-4.6\% savings}. The result is not presented as an artificial 8\% saving: the optimized model buys additional coverage.}
+\callout{\textbf{Current answer.} The reproducible demo reaches 100\% modeled and peak coverage with an optimized cost of 16,402 MXN. Its documented current policy costs 26,950 MXN, also covers 100\% overall and at peak, and records 109 overstaffed person-hours plus 70 overtime hours. The schedule-derived delta is \textbf{10,548 MXN avoided} or \textbf{39.14\% savings}; the optimized schedule has no verifier violations. The challenge target is \textbf{at least 8\%}, while this implementation computes the result from the two schedules and configured rates.}
 
 \subsection{Current status}
 \begin{tabular}{p{0.28\linewidth}p{0.62\linewidth}}
@@ -121,7 +121,7 @@ Module & Responsibility\\
 \midrule
 \endhead
 \texttt{models.py} & Immutable domain dataclasses: employees, demand points, scenarios, assignments, schedules, verification, baseline analysis, economics, and optimization results.\\
-\texttt{generator.py} & Seeded demo data and the rotating 08:00--16:00 current schedule.\\
+\texttt{generator.py} & Seeded demo data and the configurable rotating fixed-floor current policy.\\
 \texttt{demand.py} & Ceiling-based staffing requirement from visitors and service time.\\
 \texttt{baseline.py} & Current-schedule analysis, validation evidence, coverage, and schedule cost.\\
 \texttt{optimizer.py} & The only CP-SAT-dependent module; builds, solves, and reconstructs candidate assignments.\\
@@ -154,7 +154,7 @@ R_{d,h}=\max\left(1,\left\lceil\frac{8V_{d,h}}{60}\right\rceil\right).
 \]
 Hours are integer buckets; all intervals use $[\text{start},\text{end})$ semantics and all costs are integer MXN amounts.
 
-The generated current schedule rotates four employees per day through 08:00--16:00. The last two opening hours are intentionally uncovered by this simple fixed-shift baseline. This is a deterministic operational comparison, not a fully open or presumed-optimal schedule.
+The generated current policy keeps a fixed five-person floor for the full 08:00--18:00 opening interval and rotates the employees deterministically by day. This is an explicit observed-policy assumption: it is operationally simple, availability-checked, and intentionally inefficient through rigid coverage. It is not selected to produce a desired savings percentage. Removing or changing the floor changes the comparison, not the optimizer's hard constraints.
 
 The demo's peak rule is explicit and testable: every demand bucket with $12\le h<16$ is marked peak; all other modeled hours are normal.
 
@@ -237,22 +237,24 @@ The implementation returns zero percentage when the current cost is zero.
 \toprule
 Metric & Current & Optimized\\
 \midrule
-Cost (MXN) & 15,680 & 16,402\\
-Coverage & 74.27\% & 100.00\%\\
-Peak coverage & 98.08\% & 100.00\%\\
-Understaffing & 62 & 0\\
-Peak understaffing & 2 & 0\\
-Peak coverage violations & 2 & 0\\
-Overstaffing & 45 & 0\\
-Verifier violations & 16 coverage & 0\\
+Cost (MXN) & 26,950 & 16,402\\
+Coverage & 100.00\% & 100.00\%\\
+Peak coverage & 100.00\% & 100.00\%\\
+Understaffing & 0 & 0\\
+Peak understaffing & 0 & 0\\
+Peak coverage violations & 0 & 0\\
+Overstaffing & 109 & 0\\
+Total hours & 350 & 241\\
+Regular/overtime hours & 280 / 70 & 241 / 0\\
+Baseline policy violations & 7 weekly-hour policy & 0 optimized\\
 \midrule
-Avoided cost & \multicolumn{2}{c}{-722 MXN}\\
-Savings & \multicolumn{2}{c}{-4.6\%}\\
+Avoided cost & \multicolumn{2}{c}{10,548 MXN}\\
+Savings & \multicolumn{2}{c}{39.14\%}\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The flow is intentionally explicit: generate one scenario; construct the rotating current schedule; optimize the same scenario; independently analyze and verify the optimized schedule; then compare schedule-derived costs. The CLI also reports objective weights $(1,10000,20000)$, overtime threshold 40, multiplier 1.5, and zero regular-schedule overtime for both current and optimized demo schedules. The negative result is honest. The current schedule spends less because it leaves demand uncovered, while the optimizer spends 722 MXN more to reach complete modeled coverage. Reporting an invented 8\% saving would confuse a cost reduction with a service-level improvement and would violate the project's requirement that savings be computed from assignments and rates.
+The flow is intentionally explicit: generate one scenario; construct the configured fixed-floor current policy; optimize the same scenario; independently analyze and verify the optimized schedule; then compare schedule-derived costs. The CLI reports objective weights $(1,10000,20000)$, overtime threshold 40, multiplier 1.5, and regular/overtime hours for both schedules. The current policy's seven weekly-hour violations are expected evidence of the assumed rigid policy and are not present in the optimized schedule. The 8\% figure is an acceptance threshold for this scenario test, not a solver objective or a hardcoded savings value.
 
 % Future maintainers: update this table and the executive callout only after re-running the pinned demo command.
 
@@ -269,7 +271,7 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains sixteen tests, and the observed result for this work unit is:
+The repository test suite contains eighteen tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
 ................                                                         [100%]
@@ -332,7 +334,7 @@ Given hourly demand and employee availability, choose binary hourly assignments 
 \end{itemize}
 
 \subsection{Limitations and risks}
-The synthetic scenario is not a forecast. Service time is fixed at eight minutes, each employee has one generic role, rates are fixed, and overtime settings are modeling inputs rather than payroll approval. The finite shortage weights are modeling choices, not legal service-level guarantees. The baseline's coverage loss is intentional, so cost-only comparisons are misleading without coverage. Finally, the CLI is not an authorization boundary for production schedules.
+The synthetic scenario is not a forecast. Service time is fixed at eight minutes, each employee has one generic role, rates are fixed, and overtime settings are modeling inputs rather than payroll approval. The finite shortage weights are modeling choices, not legal service-level guarantees. The baseline's fixed-floor inefficiency is intentional, so cost-only comparisons are misleading without coverage. Finally, the CLI is not an authorization boundary for production schedules.
 
 \subsection{Roadmap}
 The next engineering increments should add breaks, configurable shift rules, and schedule-change penalties while preserving independent verification. API and UI layers should consume domain results rather than recompute validity or savings. Persistence and deployment controls should follow once data contracts and operational approvals exist. A defensible $\ge8\%$ savings scenario should be created only by changing explicit scenario inputs or operational assumptions, documenting the change, and verifying that coverage and constraints remain acceptable; it must never be back-solved from a desired headline.
@@ -349,7 +351,7 @@ pdflatex -interaction=nonstopmode -halt-on-error \
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{4831485}; later code changes require re-running both the demo and the report's metric claims.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{aa457d2}; later code changes require re-running both the demo and the report's metric claims.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -365,19 +367,19 @@ Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{4831485}.\\
+Exact implementation revision & Git commit \texttt{aa457d2}.\\
 \bottomrule
 \end{longtable}
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{4831485}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{4831485}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{4831485}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{4831485}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{4831485}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{4831485}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{aa457d2}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{aa457d2}.
 \end{enumerate}
 
 \revisionhistory
