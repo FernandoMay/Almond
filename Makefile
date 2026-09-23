@@ -1,4 +1,10 @@
-.PHONY: docker-up docker-health docker-down docker-validate
+.PHONY: verify docker-verify docker-up docker-health docker-down docker-validate
+
+verify:
+	./scripts/verify.sh
+
+docker-verify:
+	./scripts/docker-verify.sh
 
 docker-up:
 	docker compose up --build -d
