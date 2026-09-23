@@ -1,5 +1,7 @@
 # Data model
 
+The shared result includes deterministic presentation rows in addition to the existing business fields. `optimized_schedule` contains `employee_id`, `day`, `start`, `end`, and derived `hours`, sorted by day, employee, start, and end. `hourly_coverage` contains `day`, `hour`, `required`, `scheduled`, signed `gap` (`scheduled - required`), `coverage_percentage`, and `peak`, sorted by day and hour. The dashboard consumes these rows without recomputing domain logic.
+
 - `Employee`: id, MXN hourly cost, and per-day `[start, end)` availability.
 - `DemandPoint`: day, hour, visitor count, required integer staff, and explicit peak marker.
 - `Scenario`: employees, demand buckets, modeled days, opening hours, objective weights, and overtime configuration.

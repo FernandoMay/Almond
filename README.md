@@ -30,7 +30,7 @@ almond optimize --employees employees.csv --availability availability.csv \
   --result-json result.json --schedule-csv optimized.csv
 ```
 
-The JSON form accepts the same object as `POST /v1/optimize/json-file`. The CSV form requires exact UTF-8 headers `id,hourly_rate_mxn`, `employee_id,day,start,end`, and `day,hour,visitors,required_staff,peak`; horizon flags are required. `--result-json` writes the complete deterministic result object described above. `--schedule-csv` writes only optimized assignments with header `employee_id,day,start,end,hours`, sorted by day, start, end, and employee ID. If `--result-json` is omitted, result JSON is printed to stdout; if `--schedule-csv` is omitted, no schedule file is created. Parent directories are created only for requested output paths. Malformed files and incomplete input combinations exit non-zero with an actionable error and no traceback.
+The JSON form accepts the same object as `POST /v1/optimize/json-file`. The CSV form requires exact UTF-8 headers `id,hourly_rate_mxn`, `employee_id,day,start,end`, and `day,hour,visitors,required_staff,peak`; horizon flags are required. `--result-json` writes the complete deterministic result object, including `optimized_schedule` and `hourly_coverage` rows. `--schedule-csv` writes only optimized assignments with header `employee_id,day,start,end,hours`, sorted by day, start, end, and employee ID. If `--result-json` is omitted, result JSON is printed to stdout; if `--schedule-csv` is omitted, no schedule file is created. Parent directories are created only for requested output paths. Malformed files and incomplete input combinations exit non-zero with an actionable error and no traceback.
 
 ## API
 
@@ -46,7 +46,7 @@ The first FastAPI product surface is implemented and reuses the CLI composition 
 
 ### Local operations dashboard
 
-With the API running, open `http://127.0.0.1:8000/`. The dependency-light dashboard runs the deterministic demo through `GET /v1/demo`, uploads one validated `.json` scenario through `POST /v1/optimize/json-file`, and presents current-versus-optimized MXN cost, avoided cost, savings percentage, overall and peak coverage, overstaffing, overtime, constraint explanations, and verifier status. Demo results can download the deterministic schedule from `GET /v1/demo/schedule.csv`. Uploaded scenarios remain stateless in the browser; their schedule download is intentionally unavailable in this UI and remains available through the API or CLI.
+With the API running, open `http://127.0.0.1:8000/`. The dependency-light dashboard runs the deterministic demo through `GET /v1/demo`, uploads one validated `.json` scenario through `POST /v1/optimize/json-file`, and presents current-versus-optimized MXN cost, avoided cost, savings percentage, overall and peak coverage, overstaffing, overtime, constraint explanations, verifier status, an optimized weekly schedule table, and a day-by-hour coverage heatmap with an accessible table fallback. Demo results can download the deterministic schedule from `GET /v1/demo/schedule.csv`. Uploaded scenarios remain stateless in the browser; their schedule download is intentionally unavailable in this UI and remains available through the API or CLI.
 
 Example request:
 

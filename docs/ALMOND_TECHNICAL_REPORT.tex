@@ -44,6 +44,7 @@ Version & Date & Description\\
 0.6.0 & 2026-09-23 & Added stateless JSON/CSV ingestion and deterministic optimized schedule CSV export, commit \texttt{406b004}.\\
 0.7.0 & 2026-09-23 & Added the operational file CLI, tests, and documentation, commit \texttt{375d930}.\\
 0.8.0 & 2026-09-23 & Added the FastAPI-served local operations dashboard, route/static tests, and synchronized documentation, commit \texttt{590b1bc}.\\
+0.9.0 & 2026-09-23 & Added deterministic schedule rows, hourly coverage data, a weekly schedule table, and a peak-aware dashboard heatmap, commit \texttt{d46b2f4}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -60,8 +61,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.8.0\\
-As-of revision: & \texttt{590b1bc}\\
+Version: & 0.9.0\\
+As-of revision: & \texttt{d46b2f4}\\
 Date: & 2026-09-23\\
 Repository: & \repo
 \end{tabular}
@@ -224,7 +225,7 @@ The first HTTP surface is implemented as a thin boundary over the verified core.
   \item \texttt{GET /v1/demo} runs the default seed-40 demo and returns the same shape as the CLI.
   \item \texttt{POST /v1/optimize/demo} accepts an optional JSON \texttt{seed} (non-negative integer, default 40) and returns the same result shape.
   \item \texttt{POST /v1/optimize} accepts a typed store scenario and returns the same result shape plus a stable \texttt{scenario} metadata block.
-  \item \texttt{GET /} serves the dependency-light dashboard; \texttt{/static/styles.css} and \texttt{/static/app.js} provide its local assets. The UI runs the demo, accepts one JSON scenario upload, presents current-versus-optimized metrics and constraint explanations, and downloads the demo schedule. CSV upload and uploaded-scenario schedule download are not exposed by the UI.
+  \item \texttt{GET /} serves the dependency-light dashboard; \texttt{/static/styles.css} and \texttt{/static/app.js} provide its local assets. The UI runs the demo, accepts one JSON scenario upload, presents current-versus-optimized metrics and constraint explanations, renders the optimized weekly schedule and hourly coverage heatmap with a semantic table fallback, and downloads the demo schedule. CSV upload and uploaded-scenario schedule download are not exposed by the UI.
 \end{itemize}
 The new-store request contains non-empty \texttt{employees} and \texttt{demand}, a bounded \texttt{horizon}, unique employee IDs, unique demand \texttt{(day,hour)} slots, integer MXN rates, per-day \texttt{[start,end)} availability, visitor counts, and explicit \texttt{required\_staff}. Objective weights, overtime configuration, and baseline policy are optional. Duplicate or out-of-range input produces normal FastAPI 422 responses. The route translates the request into immutable domain objects and calls \texttt{cli.run\_scenario(scenario)}; solver, verification, and economics logic is not duplicated. A minimal reproducible request is:
 
@@ -323,13 +324,15 @@ Baseline analysis applies the same operational checks for current schedules, whi
 The repository test suite contains the engine, API, CLI, and dashboard regression tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
-.............................                                            [100%]
+.............................................                            [100%]
 \end{verbatim}
 The executable demo was also run as:
 \begin{verbatim}
 .venv/bin/almond
 \end{verbatim}
 It returned JSON with \texttt{solver\_status: OPTIMAL}, the metrics in Table 3, empty optimized violations, zero optimized overtime, explicit weights $(1,10000,20000)$, and all four reported constraint evaluations true. PDF verification for this report is specified in Section~\ref{sec:repro}.
+
+The current schedule-visualization work unit adds \texttt{optimized\_schedule} rows containing \texttt{employee\_id}, day, start, end, and hours, sorted by day/employee/interval, and \texttt{hourly\_coverage} rows containing day, hour, required, scheduled, signed gap, coverage percentage, and peak, sorted by day/hour. The dashboard presents these shared result fields without moving optimization or verification logic into the browser.
 
 \section{Constraint registry and traceability}
 \begin{longtable}{p{0.19\linewidth}p{0.22\linewidth}p{0.12\linewidth}p{0.13\linewidth}p{0.24\linewidth}}
@@ -385,6 +388,7 @@ Given hourly demand and employee availability, choose binary hourly assignments 
   \item Store objective weights in scenario configuration rather than embedding an 8\% savings target.
   \item Validate new-store input at the API boundary, then reuse the exact verified application path used by the CLI and demo API.
   \item Keep the operational CLI file boundary explicit: one JSON scenario or a complete CSV bundle, optional deterministic outputs, and no API dependency.
+  \item Derive schedule and hourly coverage visualization rows in the shared application result so every client receives deterministic, presentation-ready data.
 \end{itemize}
 
 \subsection{Limitations and risks}
@@ -406,7 +410,7 @@ pdflatex -interaction=nonstopmode -halt-on-error \
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The parent must replace the current-work-unit revision placeholder after committing. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. The parent must replace the current-work-unit revision placeholder \texttt{CURRENT\_WORK\_UNIT\_REVISION} after committing. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -423,14 +427,14 @@ Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/alm
 Operational CLI workflow & \texttt{README.md}; \texttt{docs/DATA\_MODEL.md}; \texttt{src/almond/cli.py}; \texttt{tests/test\_cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{590b1bc}.\\
+Exact implementation revision & Git commit \texttt{d46b2f4}.\\
 \bottomrule
 \end{longtable}
 
 \section{File workflow and schedule export}
 The current work unit adds a stateless file adapter over the validated API. \texttt{POST /v1/optimize/json-file} accepts a UTF-8 \texttt{.json} upload with the documented \texttt{OptimizeRequest} shape. \texttt{POST /v1/optimize/csv} accepts exact headers \texttt{id,hourly\_rate\_mxn}, \texttt{employee\_id,day,start,end}, and \texttt{day,hour,visitors,required\_staff,peak}, plus validated \texttt{days}, \texttt{opening\_hour}, and \texttt{closing\_hour} form fields. Empty files, missing headers, extra columns, duplicates, unknown employees, malformed values, and invalid ranges are rejected before optimization.\par
 
-\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. The local \texttt{almond optimize} command provides the equivalent no-API batch workflow with optional result JSON and schedule CSV paths. The dashboard is a local presentation surface; persistence, authentication, deployment, asynchronous job storage, and production hardening remain \planned. This report documents commit \texttt{590b1bc}.
+\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. The shared JSON result additionally exposes sorted \texttt{optimized\_schedule} and \texttt{hourly\_coverage} rows for the dashboard table and heatmap. The local \texttt{almond optimize} command provides the equivalent no-API batch workflow with optional result JSON and schedule CSV paths. The dashboard is a local presentation surface; persistence, authentication, deployment, asynchronous job storage, and production hardening remain \planned. This report documents commit \texttt{d46b2f4}.
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.

@@ -84,6 +84,15 @@ constraints:
     removal_impact: Invalid or ambiguous store input could reach the optimizer and produce unauditable results.
     status: implemented
 
+  - id: product.schedule_visualization
+    kind: product
+    hard: true
+    rule: Dashboard results expose deterministic optimized schedule rows and hourly coverage comparisons with peak, undercoverage, exact-coverage, and overcoverage presentation states.
+    value: optimized_schedule and hourly_coverage result fields; weekly table; coverage heatmap and semantic table fallback
+    source: Schedule visualization work unit
+    removal_impact: Operators would need to reconstruct shift and hourly coverage detail from raw assignments and demand data.
+    status: implemented
+
   - id: implementation.solver
     kind: implementation
     hard: true

@@ -1,5 +1,7 @@
 # Assumptions
 
+Result presentation rows are deterministic: optimized assignments sort by day, employee ID, start, and end; hourly coverage includes every modeled demand bucket sorted by day and hour. A signed coverage `gap` is `scheduled - required`; zero-demand rows report 100% coverage.
+
 - The demonstration has one generic employee role and seven modeled days.
 - Demand is calculated as ceiling(visitor count × service minutes / 60), with eight service minutes by default.
 - Employees have fixed hourly rates; arbitrary schedules use a configurable overtime threshold and multiplier, while optimized schedules retain a hard 40-hour cap. Breaks are not modeled.
