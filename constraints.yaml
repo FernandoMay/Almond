@@ -48,6 +48,15 @@ constraints:
     removal_impact: Removing the boundary would leave the verified core without a stable product-facing API contract.
     status: implemented
 
+  - id: product.file_ingestion_export
+    kind: product
+    hard: true
+    rule: JSON and documented CSV scenario files are validated through the existing request/domain path, and optimized schedules export as deterministic CSV.
+    value: POST /v1/optimize/json-file; POST /v1/optimize/csv; GET /v1/demo/schedule.csv; POST /v1/optimize/schedule.csv
+    source: File workflow work unit
+    removal_impact: File consumers could receive ambiguous scenarios or non-reproducible schedule artifacts.
+    status: implemented
+
   - id: product.validated_store_input
     kind: product
     hard: true

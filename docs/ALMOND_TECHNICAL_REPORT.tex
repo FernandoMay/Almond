@@ -41,6 +41,7 @@ Version & Date & Description\\
 0.3.0 & 2026-09-22 & Replaced the understaffed comparison with a documented fixed-floor baseline and added a reproducible savings acceptance scenario, commit \texttt{aa457d2}.\\
 0.4.0 & 2026-09-22 & Added the first FastAPI product surface, shared seed-aware CLI composition, API tests, and runtime metadata, commit \texttt{efa0500}.\\
 0.5.0 & 2026-09-22 & Added validated new-store input at \texttt{POST /v1/optimize}, shared scenario composition, API tests, and reproducibility evidence, commit \texttt{bf18756}.\\
+0.6.0 & 2026-09-23 & Added stateless JSON/CSV ingestion and deterministic optimized schedule CSV export, commit \texttt{406b004}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -57,8 +58,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.5.0\\
-As-of revision: & \texttt{bf18756}\\
+Version: & 0.6.0\\
+As-of revision: & \texttt{406b004}\\
 Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
@@ -231,7 +232,7 @@ The new-store request contains non-empty \texttt{employees} and \texttt{demand},
  "baseline_policy":{"staffing_floor":1,"shift_start":8,"shift_end":10}}
 \end{verbatim}
 
-The complete JSON request is the reproducibility input. Repeating it with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON. The \texttt{almond-api} console script starts Uvicorn on the local development address. No UI, persistence, file upload, authentication, or deployment has been implemented or fabricated.
+The complete JSON request or exact-schema CSV bundle is the reproducibility input. Repeating either with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON and schedule CSV. The \texttt{almond-api} console script starts Uvicorn on the local development address. Persistence, authentication, UI, deployment, and asynchronous job storage remain planned.
 
 \section{Baseline, current schedule, and economics}
 \subsection{Formulas}
@@ -392,19 +393,24 @@ Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{bf18756}.\\
+Exact implementation revision & Git commit \texttt{406b004}.\\
 \bottomrule
 \end{longtable}
+
+\section{File workflow and schedule export}
+The current work unit adds a stateless file adapter over the validated API. \texttt{POST /v1/optimize/json-file} accepts a UTF-8 \texttt{.json} upload with the documented \texttt{OptimizeRequest} shape. \texttt{POST /v1/optimize/csv} accepts exact headers \texttt{id,hourly\_rate\_mxn}, \texttt{employee\_id,day,start,end}, and \texttt{day,hour,visitors,required\_staff,peak}, plus validated \texttt{days}, \texttt{opening\_hour}, and \texttt{closing\_hour} form fields. Empty files, missing headers, extra columns, duplicates, unknown employees, malformed values, and invalid ranges are rejected before optimization.\par
+
+\texttt{GET /v1/demo/schedule.csv} and \texttt{POST /v1/optimize/schedule.csv} return \texttt{text/csv} with the stable header \texttt{employee\_id,day,start,end,hours}. Rows are sorted by day, start, end, and employee ID and contain only optimized assignments. Persistence, authentication, UI, deployment, and asynchronous job storage remain \planned. This report documents commit \texttt{406b004}.
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{bf18756}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{bf18756}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{bf18756}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{bf18756}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{bf18756}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{406b004}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{406b004}.
 \end{enumerate}
 
 \revisionhistory

@@ -12,6 +12,14 @@
 
 Hours are integer buckets. End times are exclusive. Costs are MXN integer amounts.
 
+## File contracts
+
+`POST /v1/optimize/json-file` accepts a UTF-8 file ending in `.json` whose object is the documented `OptimizeRequest` shape. It is parsed first and then validated by the same Pydantic request model.
+
+`POST /v1/optimize/csv` accepts non-empty UTF-8 files with exact headers: `employees.csv` uses `id,hourly_rate_mxn`; `availability.csv` uses `employee_id,day,start,end` (one row per employee/day); and `demand.csv` uses `day,hour,visitors,required_staff,peak` (unique slots and boolean `true`/`false` peak values). Form fields `days`, `opening_hour`, and `closing_hour` define the horizon. Missing headers, duplicate IDs/slots, duplicate availability rows, unknown employees, invalid ranges, and empty files are rejected before optimization. The parsed rows become the same `OptimizeRequest` and immutable `Scenario` used by JSON input.
+
+Schedule exports use the stable header `employee_id,day,start,end,hours`, sorted by day, start, end, and employee ID. They contain only optimized assignments; solver state and secrets are never serialized.
+
 ## API boundaries
 
 The HTTP boundary uses typed Pydantic models for health, demo, and new-store requests/responses. `OptimizeRequest` requires non-empty employees, non-empty demand, and a bounded horizon. Employees contain unique IDs, integer MXN rates, and day-keyed availability windows. Demand contains unique `(day, hour)` slots, visitors, explicit required staff, and an optional peak marker. Objective weights, overtime configuration, and baseline policy are optional. Duplicate IDs/slots, empty collections, invalid windows, and out-of-horizon values are rejected with FastAPI's standard 422 response. `DemoResponse` preserves the CLI result shape; `OptimizeResponse` adds `scenario` metadata without changing existing demo routes.

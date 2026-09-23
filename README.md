@@ -24,6 +24,9 @@ The first FastAPI product surface is implemented and reuses the CLI composition 
 - `GET /v1/demo` — returns the deterministic seed-40 result in the same JSON shape as `almond`.
 - `POST /v1/optimize/demo` — accepts an optional non-negative integer `seed` (default `40`) and returns the same result shape. Invalid request bodies use normal FastAPI `422` responses.
 - `POST /v1/optimize` — accepts a validated new-store scenario and returns the same result shape plus a `scenario` metadata block. Employees have unique IDs, non-negative MXN hourly rates, and bounded per-day availability windows. Demand buckets use unique `day`/`hour` slots and explicit `required_staff` values.
+- `POST /v1/optimize/json-file` — accepts one `.json` upload containing the documented `OptimizeRequest` object and applies the same validation and scenario path.
+- `POST /v1/optimize/csv` — accepts `employees.csv`, `availability.csv`, and `demand.csv` multipart uploads plus `days`, `opening_hour`, and `closing_hour` form fields. Exact headers are `id,hourly_rate_mxn`, `employee_id,day,start,end`, and `day,hour,visitors,required_staff,peak`; peak values are `true` or `false`.
+- `GET /v1/demo/schedule.csv` and `POST /v1/optimize/schedule.csv` — export only the optimized schedule as deterministic `text/csv` with header `employee_id,day,start,end,hours`.
 
 Example request:
 
@@ -38,15 +41,15 @@ Example request:
 
 Objective weights, overtime settings, and baseline policy are optional. The endpoint rejects empty domain collections, duplicate employee IDs, duplicate demand slots, and values outside the modeled horizon with `422`. The endpoint translates the request into immutable domain objects and uses the same baseline, optimizer, verifier, economics, and explanation path as the CLI and demo API. Repeating the same request is deterministic.
 
-The API is a local/runtime surface only. UI, persistence, authentication, and deployment remain planned; no deployment topology is implemented or implied.
+Uploaded files are statelessly parsed; duplicate IDs/slots, unknown employees, missing headers, empty files, invalid ranges, malformed JSON, and wrong extensions are rejected with clear 4xx responses. Repeating the same input produces the same result and schedule bytes. The API is a local/runtime surface only. Persistence, authentication, UI, deployment, and asynchronous job storage remain planned; no deployment topology is implemented or implied.
 
 ## Architecture
 
-`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `cli.py` composes the vertical slice; `api.py` exposes the versioned HTTP boundary by calling that same composition.
+`models.py` contains typed domain objects. `generator.py` creates deterministic data and the current schedule; `demand.py` derives staffing need; `baseline.py` analyzes the current schedule; `optimizer.py` solves the hourly CP-SAT model; `verifier.py` independently checks schedules; `economics.py` compares schedule-derived costs and coverage; `explain.py` exposes constraint results; `io.py` parses uploads and serializes schedule CSV; `cli.py` composes the vertical slice; `api.py` exposes the versioned HTTP boundary by calling that same composition.
 
 ## Limitations
 
-This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, file upload, authentication, UI, and deployment remain planned. Uncovered demand is reported rather than silently accepted.
+This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, authentication, UI, deployment, and asynchronous job storage remain planned. Uncovered demand is reported rather than silently accepted.
 
 ## AI-first engineering notes
 
