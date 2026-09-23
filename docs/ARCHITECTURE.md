@@ -6,4 +6,4 @@ Domain dataclasses are immutable and do not depend on OR-Tools. Only `optimizer.
 
 ## Product surface
 
-`api.py` is the first FastAPI boundary. `GET /health` returns the stable `ok` status and API version `v1`. `GET /v1/demo` and `POST /v1/optimize/demo` call `cli.run_demo(seed)` rather than duplicating solver or economics logic; the POST request validates a non-negative optional seed with a default of 40. The CLI and API therefore share deterministic behavior and result shape. UI, persistence, authentication, and deployment are planned, not implemented.
+`api.py` is the FastAPI boundary. `GET /health` returns the stable `ok` status and API version `v1`. `GET /v1/demo` and `POST /v1/optimize/demo` call `cli.run_demo(seed)`; `POST /v1/optimize` validates a new-store request, builds immutable domain objects, and calls `cli.run_scenario(scenario)`. Thus CLI, demo API, and new-store API share solver, verification, economics, and explanation composition rather than duplicating route logic. The new endpoint returns demo-compatible result fields plus scenario metadata. UI, persistence, file upload, authentication, and deployment are planned, not implemented.

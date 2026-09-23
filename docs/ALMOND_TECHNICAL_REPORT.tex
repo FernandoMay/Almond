@@ -40,6 +40,7 @@ Version & Date & Description\\
 0.1.0 & 2026-09-21 & Initial technical report for the previous baseline/economics revision, commit \texttt{bdfe837}.\\
 0.3.0 & 2026-09-22 & Replaced the understaffed comparison with a documented fixed-floor baseline and added a reproducible savings acceptance scenario, commit \texttt{aa457d2}.\\
 0.4.0 & 2026-09-22 & Added the first FastAPI product surface, shared seed-aware CLI composition, API tests, and runtime metadata, commit \texttt{efa0500}.\\
+0.5.0 & 2026-09-22 & Added validated new-store input at \texttt{POST /v1/optimize}, shared scenario composition, API tests, and reproducibility evidence, commit \texttt{bf18756}.\\
 \bottomrule
 \end{tabular}
 \end{table}}
@@ -56,8 +57,8 @@ Version & Date & Description\\
 {\Large Technical Report\par}
 \vfill
 \begin{tabular}{rl}
-Version: & 0.4.0\\
-As-of revision: & \texttt{efa0500}\\
+Version: & 0.5.0\\
+As-of revision: & \texttt{bf18756}\\
 Date: & 2026-09-22\\
 Repository: & \repo
 \end{tabular}
@@ -95,7 +96,7 @@ The MVP accepts synthetic hourly visitors, employee availability, and fixed hour
 \subsection{In scope}
 \begin{itemize}
   \item One generic employee role and integer hourly demand.
-  \item Seven modeled days with opening hours 08:00--18:00.
+  \item Seven modeled days with opening hours 08:00--18:00 in the demo; validated new-store requests may provide a shorter horizon and opening interval.
   \item Fixed hourly MXN rates and per-day availability windows.
   \item One contiguous interval per employee per day.
   \item A current schedule versus optimized schedule flow.
@@ -130,7 +131,7 @@ Module & Responsibility\\
 \texttt{economics.py} & Compares schedule-derived costs and operational metrics.\\
 \texttt{explain.py} & Lightweight constraint status suitable for the CLI output.\\
 \texttt{cli.py} & Composes the vertical slice and prints sorted, indented JSON.\\
-\texttt{api.py} & Exposes typed FastAPI health and versioned demo boundaries by calling the CLI composition.\\
+\texttt{api.py} & Exposes typed FastAPI health, demo, and validated new-store boundaries by calling shared application composition.\\
 \bottomrule
 \end{longtable}
 
@@ -218,8 +219,19 @@ The first HTTP surface is implemented as a thin boundary over the verified core.
   \item \texttt{GET /health} returns the stable JSON object \texttt{"status":"ok","api\_version":"v1"}.
   \item \texttt{GET /v1/demo} runs the default seed-40 demo and returns the same shape as the CLI.
   \item \texttt{POST /v1/optimize/demo} accepts an optional JSON \texttt{seed} (non-negative integer, default 40) and returns the same result shape.
+  \item \texttt{POST /v1/optimize} accepts a typed store scenario and returns the same result shape plus a stable \texttt{scenario} metadata block.
 \end{itemize}
-The API calls \texttt{cli.run\_demo(seed)} for both demo routes; solver, verification, and economics logic is not duplicated. Pydantic request and response models define the boundary, and invalid request values produce normal FastAPI 422 responses. The \texttt{almond-api} console script starts Uvicorn on the local development address. No UI, persistence, authentication, or deployment has been implemented or fabricated.
+The new-store request contains non-empty \texttt{employees} and \texttt{demand}, a bounded \texttt{horizon}, unique employee IDs, unique demand \texttt{(day,hour)} slots, integer MXN rates, per-day \texttt{[start,end)} availability, visitor counts, and explicit \texttt{required\_staff}. Objective weights, overtime configuration, and baseline policy are optional. Duplicate or out-of-range input produces normal FastAPI 422 responses. The route translates the request into immutable domain objects and calls \texttt{cli.run\_scenario(scenario)}; solver, verification, and economics logic is not duplicated. A minimal reproducible request is:
+
+\begin{verbatim}
+{"employees":[{"id":"A1","hourly_rate_mxn":100,
+  "availability":{"0":{"start":8,"end":10}}}],
+ "demand":[{"day":0,"hour":8,"visitors":8,"required_staff":1}],
+ "horizon":{"days":1,"opening_hour":8,"closing_hour":10},
+ "baseline_policy":{"staffing_floor":1,"shift_start":8,"shift_end":10}}
+\end{verbatim}
+
+The complete JSON request is the reproducibility input. Repeating it with the fixed single-worker, seed-40 CP-SAT configuration produces byte/semantic-equivalent JSON. The \texttt{almond-api} console script starts Uvicorn on the local development address. No UI, persistence, file upload, authentication, or deployment has been implemented or fabricated.
 
 \section{Baseline, current schedule, and economics}
 \subsection{Formulas}
@@ -282,10 +294,10 @@ The verifier is a separate module and checks every returned assignment for:
 Baseline analysis applies the same operational checks for current schedules, while deliberately ignoring unknown employee IDs when calculating cost rather than raising a key error. It still reports the unknown ID as a violation. This makes bad input visible and keeps diagnostic analysis safe.
 
 \subsection{Tests and exact verification commands}
-The repository test suite contains twenty-four tests, and the observed result for this work unit is:
+The repository test suite contains twenty-nine tests, and the observed result for this work unit is:
 \begin{verbatim}
 .venv/bin/pytest -q
-........................                                                 [100%]
+.............................                                            [100%]
 \end{verbatim}
 The executable demo was also run as:
 \begin{verbatim}
@@ -315,12 +327,12 @@ Known employee & \texttt{verifier.py}; \texttt{baseline.py} & Referential validi
 Cost identity & \texttt{baseline.py}; \texttt{economics.py} & Measurement & Derived, not solver-hard & Economics could be disconnected from actual assignments.\\
 Overtime pricing & \texttt{baseline.py}; \texttt{economics.py} & Financial & Derived, not solver-hard & Schedules above the regular threshold could be underpriced.\\
 Objective weights & \texttt{models.py}; \texttt{optimizer.py}; \texttt{cli.py} & Optimization & Configured, not solver-hard & Tradeoffs would be opaque and difficult to reproduce.\\
-API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health and demo surface.\\
+API contract & \texttt{api.py}; \texttt{tests/test\_api.py} & Product boundary & Implemented & The verified core would lack a stable health, demo, and validated store-input surface.\\
 \bottomrule
 \end{longtable}
 
 \section{AI-assisted engineering log}
-The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; and later implementation writers added baseline economics and this peak/overtime/objective work unit. The latest unit adds deterministic peak marking, hard-first peak coverage with visible fallback, configurable objective coefficients, and overtime pricing without changing the hard 40-hour optimizer cap.
+The project used bounded AI-agent work units with human review between them. One implementation writer created the initial vertical slice; an independent verifier inspected the result; a correction writer fixed the confirmed overlap defect; later writers added baseline economics, peak/overtime/objective behavior, the demo API, and the validated new-store API. The latest unit adds typed request validation, immutable scenario translation, shared application composition, and deterministic custom-scenario evidence without changing the hard 40-hour optimizer cap.
 
 The human owner retained authority over product scope, modeling assumptions, acceptance of findings, commit boundaries, and repository delivery. Agents did not commit or push changes. The work-unit prompts required exact test and runtime commands, and the parent reviewed the returned evidence before committing.
 
@@ -343,6 +355,7 @@ Given hourly demand and employee availability, choose binary hourly assignments 
   \item Compute costs from generated assignments and employee rates, including configured overtime premiums for arbitrary schedules.
   \item Keep peak coverage explicit and separately auditable from normal coverage.
   \item Store objective weights in scenario configuration rather than embedding an 8\% savings target.
+  \item Validate new-store input at the API boundary, then reuse the exact verified application path used by the CLI and demo API.
 \end{itemize}
 
 \subsection{Limitations and risks}
@@ -355,7 +368,7 @@ The next engineering increments should add breaks, configurable shift rules, and
 \label{sec:repro}
 From the repository root, install the package and run the following:
 \begin{verbatim}
-python -m pip install -e "."
+.venv/bin/pip install -e ".[test]"
 .venv/bin/pytest -q
 .venv/bin/almond
 pdflatex -interaction=nonstopmode -halt-on-error \
@@ -363,7 +376,7 @@ pdflatex -interaction=nonstopmode -halt-on-error \
 pdflatex -interaction=nonstopmode -halt-on-error \
   -output-directory /tmp/almond-latex docs/ALMOND_TECHNICAL_REPORT.tex
 \end{verbatim}
-The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{efa0500}; later code changes require re-running both the demo and the report's metric claims.
+The second LaTeX pass resolves references. The expected PDF is \texttt{/tmp/almond-latex/ALMOND\_TECHNICAL\_REPORT.pdf}. This report documents commit \texttt{bf18756}. The seed-40 metrics remain 26,950 MXN current cost, 16,402 MXN optimized cost, 10,548 MXN avoided cost, 39.14\% savings, 100\% overall and peak coverage, 109 baseline overstaffed hours, 70 baseline overtime hours, and zero optimized verifier violations.
 
 \section{Evidence table}
 \begin{longtable}{p{0.34\linewidth}p{0.55\linewidth}}
@@ -379,19 +392,19 @@ Solver variables, constraints, objective, settings & \texttt{docs/SOLVER\_MODEL.
 Current baseline and metrics & \texttt{src/almond/generator.py}; \texttt{src/almond/baseline.py}; \texttt{src/almond/economics.py}; \texttt{src/almond/cli.py}\\
 Independent validation & \texttt{src/almond/verifier.py}; \texttt{tests/test\_engine.py}\\
 AI boundaries and solver prompt & \texttt{docs/AI\_ENGINEERING\_LOG.md}\\
-Exact implementation revision & Git commit \texttt{efa0500}.\\
+Exact implementation revision & Git commit \texttt{bf18756}.\\
 \bottomrule
 \end{longtable}
 
 \section{References}
 All references are internal to the repository; no external claims are required for this report.
 \begin{enumerate}
-  \item \texttt{README.md}, Almond repository, commit \texttt{efa0500}.
-  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{efa0500}.
-  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{efa0500}.
-  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{efa0500}.
-  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{efa0500}.
-  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{efa0500}.
+  \item \texttt{README.md}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{docs/ARCHITECTURE.md}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{docs/SOLVER\_MODEL.md}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{docs/DATA\_MODEL.md} and \texttt{docs/ASSUMPTIONS.md}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{docs/AI\_ENGINEERING\_LOG.md}, Almond repository, commit \texttt{bf18756}.
+  \item \texttt{src/almond/} and \texttt{tests/test\_engine.py}, Almond repository, commit \texttt{bf18756}.
 \end{enumerate}
 
 \revisionhistory

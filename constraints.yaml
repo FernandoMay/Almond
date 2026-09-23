@@ -48,6 +48,15 @@ constraints:
     removal_impact: Removing the boundary would leave the verified core without a stable product-facing API contract.
     status: implemented
 
+  - id: product.validated_store_input
+    kind: product
+    hard: true
+    rule: POST /v1/optimize accepts a typed non-empty store scenario with unique employee IDs and demand slots, bounded windows, explicit required staff, and in-horizon values.
+    value: Pydantic request models; FastAPI 422 for invalid input
+    source: New-store optimization API work unit
+    removal_impact: Invalid or ambiguous store input could reach the optimizer and produce unauditable results.
+    status: implemented
+
   - id: implementation.solver
     kind: implementation
     hard: true

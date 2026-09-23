@@ -23,6 +23,20 @@ The first FastAPI product surface is implemented and reuses the CLI composition 
 - `GET /health` — returns `{"status":"ok","api_version":"v1"}`.
 - `GET /v1/demo` — returns the deterministic seed-40 result in the same JSON shape as `almond`.
 - `POST /v1/optimize/demo` — accepts an optional non-negative integer `seed` (default `40`) and returns the same result shape. Invalid request bodies use normal FastAPI `422` responses.
+- `POST /v1/optimize` — accepts a validated new-store scenario and returns the same result shape plus a `scenario` metadata block. Employees have unique IDs, non-negative MXN hourly rates, and bounded per-day availability windows. Demand buckets use unique `day`/`hour` slots and explicit `required_staff` values.
+
+Example request:
+
+```json
+{
+  "employees": [{"id": "A1", "hourly_rate_mxn": 100, "availability": {"0": {"start": 8, "end": 10}}}],
+  "demand": [{"day": 0, "hour": 8, "visitors": 8, "required_staff": 1}],
+  "horizon": {"days": 1, "opening_hour": 8, "closing_hour": 10},
+  "baseline_policy": {"staffing_floor": 1, "shift_start": 8, "shift_end": 10}
+}
+```
+
+Objective weights, overtime settings, and baseline policy are optional. The endpoint rejects empty domain collections, duplicate employee IDs, duplicate demand slots, and values outside the modeled horizon with `422`. The endpoint translates the request into immutable domain objects and uses the same baseline, optimizer, verifier, economics, and explanation path as the CLI and demo API. Repeating the same request is deterministic.
 
 The API is a local/runtime surface only. UI, persistence, authentication, and deployment remain planned; no deployment topology is implemented or implied.
 
@@ -32,7 +46,7 @@ The API is a local/runtime surface only. UI, persistence, authentication, and de
 
 ## Limitations
 
-This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, and a UI remain out of scope. Uncovered demand is reported rather than silently accepted.
+This MVP models one role, integer hourly demand, fixed hourly rates, explicit peak buckets, and a single contiguous interval per employee per day. It prices arbitrary schedules with configurable regular-hour thresholds and overtime multipliers; the optimized schedule retains a hard 40-hour weekly cap. Breaks, skills, absences, payroll, persistence, file upload, authentication, UI, and deployment remain planned. Uncovered demand is reported rather than silently accepted.
 
 ## AI-first engineering notes
 
