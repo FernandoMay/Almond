@@ -97,6 +97,7 @@ def analyze_baseline(schedule: Schedule, scenario: Scenario) -> BaselineAnalysis
         for point in scenario.demand
         if point.peak
     )
+    regular_hours, overtime_hours = hours_by_employee(schedule, scenario)
     return BaselineAnalysis(
         schedule=schedule,
         cost_mxn=schedule_cost(schedule, scenario),
@@ -115,4 +116,6 @@ def analyze_baseline(schedule: Schedule, scenario: Scenario) -> BaselineAnalysis
         peak_coverage_violations=peak_coverage_violations,
         peak_required=peak_required,
         peak_covered=peak_covered,
+        regular_hours=regular_hours,
+        overtime_hours=overtime_hours,
     )

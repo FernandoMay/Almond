@@ -2,7 +2,7 @@ from almond.baseline import analyze_baseline, build_baseline
 from almond.economics import compare
 from almond.generator import generate_current_schedule, generate_demo
 from almond.demand import calculate_demand, required_staff
-from almond.models import Assignment, Employee, ObjectiveWeights, OptimizationConfig, OvertimeConfig, Scenario, Schedule
+from almond.models import Assignment, BaselinePolicy, Employee, ObjectiveWeights, OptimizationConfig, OvertimeConfig, Scenario, Schedule
 from almond.baseline import overtime_hours_by_employee, schedule_cost
 from almond.optimizer import optimize
 from almond.verifier import verify
@@ -12,6 +12,20 @@ def test_generation_is_deterministic():
     assert generate_demo() == generate_demo()
     scenario = generate_demo()
     assert generate_current_schedule(scenario) == generate_current_schedule(scenario)
+
+
+def test_demo_baseline_policy_covers_demand_and_measures_operating_waste():
+    scenario = generate_demo()
+    analysis = analyze_baseline(build_baseline(scenario), scenario)
+
+    assert scenario.baseline_policy == BaselinePolicy(5, 8, 18)
+    assert analysis.understaffing == 0
+    assert analysis.peak_understaffing == 0
+    assert analysis.overstaffing > 0
+    assert sum(analysis.overtime_hours.values()) > 0
+    assert len(analysis.weekly_hour_violations) == len(scenario.employees)
+    assert not analysis.availability_violations
+    assert not analysis.coverage_violations
 
 
 def test_demo_marks_only_the_documented_midday_peak_window():
@@ -129,7 +143,20 @@ def test_economics_formula():
     result = compare(base, optimized, scenario)
     assert result.avoided_cost_mxn == result.baseline_cost_mxn - result.optimized_cost_mxn
     assert result.savings_percentage == result.avoided_cost_mxn / result.baseline_cost_mxn * 100
-    assert result.baseline_coverage_percentage < result.optimized_coverage_percentage
+    assert result.baseline_coverage_percentage == result.optimized_coverage_percentage == 100.0
+    assert result.avoided_cost_mxn == analyze_baseline(base, scenario).cost_mxn - schedule_cost(optimized, scenario)
+
+
+def test_demo_acceptance_target_is_scenario_level_not_a_savings_input():
+    scenario = generate_demo()
+    base = build_baseline(scenario)
+    optimized_result = optimize(scenario)
+    optimized_check = verify(optimized_result.schedule, scenario)
+    result = compare(base, optimized_result.schedule, scenario)
+
+    assert optimized_check.valid
+    assert optimized_check.peak_violations == ()
+    assert result.savings_percentage >= 8.0
 
 
 def test_economics_handles_zero_cost_baseline():

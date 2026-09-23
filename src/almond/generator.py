@@ -36,21 +36,25 @@ def generate_demo(seed: int = 40) -> Scenario:
 
 
 def generate_current_schedule(scenario: Scenario) -> Schedule:
-    """Generate a stable, plausible current schedule for the same scenario.
+    """Generate the configured fixed-floor operating policy.
 
-    This represents a simple fixed-shift operation rather than an arbitrary
-    fully staffed comparison. Four employees rotate through 08:00–16:00
-    shifts, leaving the final two opening hours uncovered by design.
+    The demo policy represents an observed practice assumption: a fixed
+    five-person floor covers every opening hour, with employees rotated
+    deterministically by day. It is intentionally simple and overstaffs quiet
+    buckets; it is not selected from the target savings percentage.
     """
     assignments = []
     employee_count = len(scenario.employees)
     if not employee_count:
         return Schedule(())
+    policy = scenario.baseline_policy
+    if policy.staffing_floor <= 0 or policy.shift_start >= policy.shift_end:
+        return Schedule(())
     for day in range(scenario.days):
-        for offset in range(min(4, employee_count)):
+        for offset in range(min(policy.staffing_floor, employee_count)):
             employee = scenario.employees[(day + offset) % employee_count]
-            start = scenario.open_start
-            end = min(scenario.open_end, start + 8)
+            start = policy.shift_start
+            end = policy.shift_end
             if employee.availability.get(day, (0, 0))[0] <= start and end <= employee.availability.get(day, (0, 0))[1]:
                 assignments.append(Assignment(employee.id, day, start, end))
     return Schedule(tuple(assignments))

@@ -24,6 +24,15 @@ class OptimizationConfig:
 
 
 @dataclass(frozen=True)
+class BaselinePolicy:
+    """Explicit operating policy used for the current-schedule comparison."""
+
+    staffing_floor: int = 5
+    shift_start: int = 8
+    shift_end: int = 18
+
+
+@dataclass(frozen=True)
 class Employee:
     id: str
     hourly_cost_mxn: int
@@ -47,6 +56,7 @@ class Scenario:
     open_start: int = 8
     open_end: int = 18
     optimization: OptimizationConfig = field(default_factory=OptimizationConfig)
+    baseline_policy: BaselinePolicy = field(default_factory=BaselinePolicy)
 
 
 @dataclass(frozen=True)
@@ -103,6 +113,8 @@ class BaselineAnalysis:
     peak_coverage_violations: tuple[str, ...] = field(default_factory=tuple)
     peak_required: int = 0
     peak_covered: int = 0
+    regular_hours: Mapping[str, int] = field(default_factory=dict)
+    overtime_hours: Mapping[str, int] = field(default_factory=dict)
 
     @property
     def peak_coverage_percentage(self) -> float:
